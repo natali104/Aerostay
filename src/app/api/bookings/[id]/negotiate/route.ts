@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { resend, FROM_EMAIL } from '@/lib/resend'
+import { getResend, FROM_EMAIL } from '@/lib/resend'
 import { negotiationEmail } from '@/lib/email-templates'
 import { formatCurrency } from '@/lib/utils'
 
@@ -101,7 +101,7 @@ export async function POST(
       })
 
       try {
-        await resend.emails.send({
+        await getResend().emails.send({
           from: FROM_EMAIL,
           to: hotel.contact_email,
           subject: emailData.subject,
@@ -122,7 +122,7 @@ export async function POST(
       })
 
       try {
-        await resend.emails.send({
+        await getResend().emails.send({
           from: FROM_EMAIL,
           to: booking.contact_email,
           subject: emailData.subject,
