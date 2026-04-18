@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { formatEuro, formatDate } from '@/lib/format'
@@ -36,7 +37,7 @@ export default async function AirlineBookingsPage() {
   const { data: bookings } = await supabase
     .from('booking_requests')
     .select(
-      'id, guest_count, check_in, check_out, total_amount, status, contact_name, confirmed_at, created_at, layover:layovers(flight_number, passenger_count), hotel:hotels(name)'
+      'id, layover_id, guest_count, check_in, check_out, total_amount, status, contact_name, confirmed_at, created_at, layover:layovers(id, flight_number, passenger_count), hotel:hotels(name)'
     )
     .eq('airline_id', profile.airline_id)
     .order('created_at', { ascending: false })
@@ -46,7 +47,7 @@ export default async function AirlineBookingsPage() {
     const hotel = Array.isArray(b.hotel) ? b.hotel[0] : b.hotel
     return {
       ...b,
-      _layover: layover as { flight_number: string; passenger_count: number } | null,
+      _layover: layover as { id: string; flight_number: string; passenger_count: number } | null,
       _hotel: hotel as { name: string } | null,
     }
   })
@@ -87,13 +88,16 @@ export default async function AirlineBookingsPage() {
                 <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
                   Date
                 </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.06]">
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="px-6 py-16 text-center text-[#94A3B8]"
                   >
                     No booking records found
@@ -137,6 +141,16 @@ export default async function AirlineBookingsPage() {
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
                         {row.created_at ? formatDate(row.created_at) : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        {(row.layover_id || row._layover?.id) && (
+                          <Link
+                            href={`/dashboard/airline/layovers/${row.layover_id ?? row._layover?.id ?? ''}`}
+                            className="text-xs text-[#3B9EFF] hover:underline"
+                          >
+                            View →
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   )
