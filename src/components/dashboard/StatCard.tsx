@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react'
 
-interface StatCardProps {
-  title: string
+export function StatCard({
+  label,
+  title,
+  value,
+  subtitle,
+  icon,
+}: {
+  label?: string
+  title?: string
   value: string | number
   subtitle?: string
-  trend?: number
   icon?: ReactNode
-}
+}) {
+  const heading = label ?? title ?? ''
 
-export function StatCard({ title, value, subtitle, trend, icon }: StatCardProps) {
   return (
     <div
       className="relative overflow-hidden rounded-xl p-5"
@@ -34,7 +40,7 @@ export function StatCard({ title, value, subtitle, trend, icon }: StatCardProps)
           color: '#94A3B8',
         }}
       >
-        {title}
+        {heading}
       </p>
 
       <p
@@ -48,18 +54,6 @@ export function StatCard({ title, value, subtitle, trend, icon }: StatCardProps)
         <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>
           {subtitle}
         </p>
-      )}
-
-      {trend != null && trend !== 0 && (
-        <span
-          className="mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-          style={{
-            backgroundColor: trend > 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-            color: trend > 0 ? '#22C55E' : '#EF4444',
-          }}
-        >
-          {trend > 0 ? `↑ +${trend}%` : `↓ ${trend}%`}
-        </span>
       )}
     </div>
   )

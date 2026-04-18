@@ -2,21 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
-import { Modal, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/modal'
-import { UserPlus, Pencil, Trash2, Mail, Shield } from 'lucide-react'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { UserPlus, Pencil, Trash2, X, Check } from 'lucide-react'
 
 interface Contact {
   id: string
@@ -26,28 +13,24 @@ interface Contact {
   is_primary: boolean
 }
 
-const roleOptions = [
-  { value: 'operations', label: 'Operations' },
-  { value: 'crew_manager', label: 'Crew Manager' },
-  { value: 'dispatch', label: 'Dispatch' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'other', label: 'Other' },
-]
+const roleOptions = ['operations', 'crew_manager', 'dispatch', 'admin', 'other']
 
 export default function AirlineContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [airlineId, setAirlineId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingContact, setEditingContact] = useState<Contact | null>(null)
-  const [formData, setFormData] = useState({ name: '', email: '', role: 'operations', is_primary: false })
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({ name: '', email: '', role: 'operations' })
   const [submitting, setSubmitting] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   const loadContacts = useCallback(async () => {
     const supabase = createClient()
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
 
     const { data: profile } = await supabase
@@ -75,21 +58,16 @@ export default function AirlineContactsPage() {
     void loadContacts()
   }, [loadContacts])
 
-  function openAddModal() {
-    setEditingContact(null)
-    setFormData({ name: '', email: '', role: 'operations', is_primary: false })
-    setModalOpen(true)
+  function openAdd() {
+    setEditingId(null)
+    setForm({ name: '', email: '', role: 'operations' })
+    setShowForm(true)
   }
 
-  function openEditModal(contact: Contact) {
-    setEditingContact(contact)
-    setFormData({
-      name: contact.name,
-      email: contact.email,
-      role: contact.role,
-      is_primary: contact.is_primary,
-    })
-    setModalOpen(true)
+  function openEdit(c: Contact) {
+    setEditingId(c.id)
+    setForm({ name: c.name, email: c.email, role: c.role })
+    setShowForm(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -99,41 +77,29 @@ export default function AirlineContactsPage() {
 
     const supabase = createClient()
 
-    if (formData.is_primary) {
+    if (editingId) {
       await supabase
         .from('airline_contacts')
-        .update({ is_primary: false })
-        .eq('airline_id', airlineId)
-    }
-
-    if (editingContact) {
-      await supabase
-        .from('airline_contacts')
-        .update({
-          name: formData.name,
-          email: formData.email,
-          role: formData.role,
-          is_primary: formData.is_primary,
-        })
-        .eq('id', editingContact.id)
+        .update({ name: form.name, email: form.email, role: form.role })
+        .eq('id', editingId)
     } else {
       await supabase.from('airline_contacts').insert({
         airline_id: airlineId,
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        is_primary: formData.is_primary,
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        is_primary: false,
       })
     }
 
-    setModalOpen(false)
+    setShowForm(false)
     setSubmitting(false)
     loadContacts()
   }
 
-  async function handleDelete(contactId: string) {
+  async function handleDelete(id: string) {
     const supabase = createClient()
-    await supabase.from('airline_contacts').delete().eq('id', contactId)
+    await supabase.from('airline_contacts').delete().eq('id', id)
     setDeleteConfirm(null)
     loadContacts()
   }
@@ -159,177 +125,208 @@ export default function AirlineContactsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1e3a5f] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#0B1120]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#3B9EFF] border-t-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Contacts</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage contacts who receive layover booking notifications
-          </p>
-        </div>
-        <Button onClick={openAddModal} size="md">
+    <div className="min-h-screen bg-[#0B1120] p-6">
+      <DashboardHeader
+        title="Contacts"
+        subtitle="Manage notification contacts for layover alerts"
+      />
+
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 rounded-lg bg-[#3B9EFF] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#3B9EFF]/90"
+        >
           <UserPlus className="h-4 w-4" />
           Add Contact
-        </Button>
+        </button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Notification Recipients
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {contacts.length === 0 ? (
-            <div className="py-12 text-center">
-              <Mail className="mx-auto h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">No contacts added yet</p>
-              <p className="mt-1 text-xs text-gray-400">
-                Add contacts to receive layover booking notifications via email
-              </p>
-              <Button onClick={openAddModal} variant="outline" size="sm" className="mt-4">
-                <UserPlus className="h-4 w-4" />
-                Add First Contact
-              </Button>
+      {showForm && (
+        <div className="mb-6 rounded-xl border border-white/[0.08] bg-[#111827] p-6">
+          <h3 className="mb-4 text-lg font-semibold text-[#F1F5F9]">
+            {editingId ? 'Edit Contact' : 'New Contact'}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#94A3B8]">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  required
+                  placeholder="Jane Smith"
+                  className="w-full rounded-lg border border-white/[0.1] bg-[#0B1120] px-3 py-2.5 text-sm text-[#F1F5F9] placeholder-[#94A3B8]/50 focus:border-[#3B9EFF] focus:outline-none focus:ring-1 focus:ring-[#3B9EFF]"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#94A3B8]">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  required
+                  placeholder="jane@airline.com"
+                  className="w-full rounded-lg border border-white/[0.1] bg-[#0B1120] px-3 py-2.5 text-sm text-[#F1F5F9] placeholder-[#94A3B8]/50 focus:border-[#3B9EFF] focus:outline-none focus:ring-1 focus:ring-[#3B9EFF]"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#94A3B8]">
+                  Role
+                </label>
+                <select
+                  value={form.role}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.1] bg-[#0B1120] px-3 py-2.5 text-sm text-[#F1F5F9] focus:border-[#3B9EFF] focus:outline-none focus:ring-1 focus:ring-[#3B9EFF]"
+                >
+                  {roleOptions.map((r) => (
+                    <option key={r} value={r}>
+                      {r.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Primary</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {contacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell className="font-medium">{contact.name}</TableCell>
-                    <TableCell className="text-gray-600">{contact.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="info">
-                        {contact.role?.replace(/_/g, ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-lg bg-[#3B9EFF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3B9EFF]/90 disabled:opacity-50"
+              >
+                {submitting ? 'Saving...' : editingId ? 'Update' : 'Add'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="rounded-lg border border-white/[0.1] px-4 py-2 text-sm font-medium text-[#94A3B8] hover:bg-white/[0.06]"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-white/[0.08] bg-[#111827] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.08]">
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Name
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Email
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Role
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Primary
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8] text-right">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.06]">
+              {contacts.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-16 text-center text-[#94A3B8]"
+                  >
+                    No contacts added yet
+                  </td>
+                </tr>
+              ) : (
+                contacts.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="transition-colors hover:bg-white/[0.02]"
+                  >
+                    <td className="whitespace-nowrap px-6 py-4 font-medium text-[#F1F5F9]">
+                      {c.name}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
+                      {c.email}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="inline-flex items-center rounded-full bg-[#3B9EFF]/15 px-2.5 py-0.5 text-xs font-medium text-[#3B9EFF]">
+                        {c.role?.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
                       <button
-                        onClick={() => togglePrimary(contact)}
-                        className="flex items-center gap-1 text-sm"
+                        onClick={() => togglePrimary(c)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                          c.is_primary ? 'bg-[#22C55E]' : 'bg-white/[0.1]'
+                        }`}
+                        role="switch"
+                        aria-checked={c.is_primary}
                       >
-                        <Shield
-                          className={`h-4 w-4 ${
-                            contact.is_primary
-                              ? 'fill-emerald-500 text-emerald-500'
-                              : 'text-gray-300'
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            c.is_primary ? 'translate-x-5' : 'translate-x-0'
                           }`}
                         />
-                        {contact.is_primary && (
-                          <span className="text-xs text-emerald-600">Primary</span>
-                        )}
                       </button>
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => openEditModal(contact)}
-                          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          onClick={() => openEdit(c)}
+                          className="rounded-md p-2 text-[#94A3B8] hover:bg-white/[0.06] hover:text-[#F1F5F9]"
                           aria-label="Edit contact"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        {deleteConfirm === contact.id ? (
+                        {deleteConfirm === c.id ? (
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => handleDelete(contact.id)}
-                              className="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+                              onClick={() => handleDelete(c.id)}
+                              className="rounded-md bg-red-500/20 p-2 text-red-400 hover:bg-red-500/30"
+                              aria-label="Confirm delete"
                             >
-                              Confirm
+                              <Check className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(null)}
-                              className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                              className="rounded-md p-2 text-[#94A3B8] hover:bg-white/[0.06]"
+                              aria-label="Cancel delete"
                             >
-                              Cancel
+                              <X className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
                           <button
-                            onClick={() => setDeleteConfirm(contact.id)}
-                            className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            onClick={() => setDeleteConfirm(c.id)}
+                            className="rounded-md p-2 text-[#94A3B8] hover:bg-red-500/20 hover:text-red-400"
                             aria-label="Delete contact"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
-        <ModalTitle>{editingContact ? 'Edit Contact' : 'Add Contact'}</ModalTitle>
-        <form onSubmit={handleSubmit}>
-          <ModalBody className="space-y-4">
-            <Input
-              label="Full Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              placeholder="Jane Smith"
-            />
-            <Input
-              label="Email Address"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              placeholder="jane@airline.com"
-            />
-            <Select
-              label="Role"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              options={roleOptions}
-            />
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={formData.is_primary}
-                onChange={(e) => setFormData({ ...formData, is_primary: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#38bdf8]"
-              />
-              <span className="text-gray-700">Set as primary contact</span>
-            </label>
-          </ModalBody>
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {editingContact ? 'Update' : 'Add'} Contact
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

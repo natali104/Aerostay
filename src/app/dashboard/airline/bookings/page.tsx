@@ -1,34 +1,22 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
-import { CalendarCheck } from 'lucide-react'
-import { BookingsFilter } from './bookings-filter'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { formatEuro, formatDate } from '@/lib/format'
 
-const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
-  pending: 'warning',
-  confirmed: 'success',
-  cancelled: 'danger',
-  completed: 'info',
-  declined: 'danger',
-  negotiating: 'warning',
+const statusColors: Record<string, { bg: string; text: string }> = {
+  pending: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
+  confirmed: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
+  cancelled: { bg: 'bg-red-500/20', text: 'text-red-400' },
+  completed: { bg: 'bg-[#3B9EFF]/20', text: 'text-[#3B9EFF]' },
+  declined: { bg: 'bg-red-500/20', text: 'text-red-400' },
+  negotiating: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
+  detected: { bg: 'bg-slate-500/20', text: 'text-slate-300' },
+  notified: { bg: 'bg-[#3B9EFF]/20', text: 'text-[#3B9EFF]' },
+  booking_in_progress: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
+  booked: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
 }
 
-export default async function AirlineBookingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string }>
-}) {
-  const { status: statusFilter } = await searchParams
+export default async function AirlineBookingsPage() {
   const supabase = await createClient()
 
   const {
@@ -45,94 +33,119 @@ export default async function AirlineBookingsPage({
 
   if (!profile?.airline_id) redirect('/dashboard')
 
-  let query = supabase
+  const { data: bookings } = await supabase
     .from('booking_requests')
-    .select('id, hotel_id, guest_count, check_in, check_out, total_amount, status, created_at, hotel:hotels(name)')
+    .select(
+      'id, guest_count, check_in, check_out, total_amount, status, contact_name, confirmed_at, created_at, layover:layovers(flight_number, passenger_count), hotel:hotels(name)'
+    )
     .eq('airline_id', profile.airline_id)
     .order('created_at', { ascending: false })
 
-  if (statusFilter && statusFilter !== 'all') {
-    query = query.eq('status', statusFilter)
-  }
-
-  const { data: bookings } = await query
+  const rows = (bookings ?? []).map((b) => {
+    const layover = Array.isArray(b.layover) ? b.layover[0] : b.layover
+    const hotel = Array.isArray(b.hotel) ? b.hotel[0] : b.hotel
+    return {
+      ...b,
+      _layover: layover as { flight_number: string; passenger_count: number } | null,
+      _hotel: hotel as { name: string } | null,
+    }
+  })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Bookings</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            All booking requests for your airline
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CalendarCheck className="h-5 w-5 text-[#1e3a5f]" />
-          <span className="text-sm font-medium text-gray-600">
-            {bookings?.length ?? 0} booking{(bookings?.length ?? 0) !== 1 ? 's' : ''}
-          </span>
+    <div className="min-h-screen bg-[#0B1120] p-6">
+      <DashboardHeader
+        title="Booking History"
+        subtitle="All booking requests and layover events"
+      />
+
+      <div className="rounded-xl border border-white/[0.08] bg-[#111827] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.08]">
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Flight
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Hotel
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Guests
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Check-in
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Check-out
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Amount
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-[#94A3B8]">
+                  Date
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.06]">
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-16 text-center text-[#94A3B8]"
+                  >
+                    No booking records found
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => {
+                  const colors =
+                    statusColors[row.status] ?? statusColors.pending
+                  return (
+                    <tr
+                      key={row.id}
+                      className="transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-[#F1F5F9]">
+                        {row._layover?.flight_number ?? '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-[#F1F5F9]">
+                        {row._hotel?.name ?? '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
+                        {row.guest_count}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
+                        {row.check_in ? formatDate(row.check_in) : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
+                        {row.check_out ? formatDate(row.check_out) : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-[#F1F5F9]">
+                        {row.total_amount
+                          ? formatEuro(Number(row.total_amount))
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+                        >
+                          {row.status?.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-[#94A3B8]">
+                        {row.created_at ? formatDate(row.created_at) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <BookingsFilter currentStatus={statusFilter ?? 'all'} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Booking Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!bookings || bookings.length === 0 ? (
-            <p className="py-12 text-center text-sm text-gray-400">
-              No bookings found{statusFilter && statusFilter !== 'all' ? ` with status "${statusFilter}"` : ''}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Booking ID</TableHead>
-                  <TableHead>Hotel</TableHead>
-                  <TableHead>Guests</TableHead>
-                  <TableHead>Check-in</TableHead>
-                  <TableHead>Check-out</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bookings.map((booking) => {
-                  const hotelRaw = booking.hotel as unknown
-                  const hotel = Array.isArray(hotelRaw) ? hotelRaw[0] as { name: string } | undefined : hotelRaw as { name: string } | null
-                  return (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-mono text-xs">
-                        {booking.id.slice(0, 8)}…
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {hotel?.name ?? '—'}
-                      </TableCell>
-                      <TableCell>{booking.guest_count}</TableCell>
-                      <TableCell>{formatDate(booking.check_in)}</TableCell>
-                      <TableCell>{formatDate(booking.check_out)}</TableCell>
-                      <TableCell>
-                        {formatCurrency(Number(booking.total_amount) || 0)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant[booking.status] ?? 'default'}>
-                          {booking.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-gray-500">
-                        {formatDateTime(booking.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

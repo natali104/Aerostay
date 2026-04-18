@@ -1,66 +1,65 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatEuro } from '@/lib/format'
+import { Bell, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react'
 
-interface BookingRequest {
+interface Event {
   id: string
-  guest_count: number
-  total_amount: number
-  status: string
-  notes: string | null
-  created_at: string
-  layovers: {
-    flight_number: string
-    passenger_count: number
-  }
-  airlines: {
-    name: string
-  }
+  type: string
+  message: string
+  time: string
 }
 
-interface LiveEventFeedProps {
-  hotelId: string
+const iconMap: Record<string, React.ReactNode> = {
+  confirmed: <CheckCircle className="h-4 w-4 text-[#22C55E]" />,
+  rejected: <XCircle className="h-4 w-4 text-red-400" />,
+  pending: <Clock className="h-4 w-4 text-[#F5A623]" />,
+  negotiating: <MessageSquare className="h-4 w-4 text-[#3B9EFF]" />,
 }
 
-export function LiveEventFeed({ hotelId }: LiveEventFeedProps) {
-  const [requests, setRequests] = useState<BookingRequest[]>([])
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+export function LiveEventFeed({ hotelId }: { hotelId: string }) {
+  const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
-  const [negotiatingId, setNegotiatingId] = useState<string | null>(null)
-  const [negotiateText, setNegotiateText] = useState('')
-  const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set())
-
-  const supabase = createClient()
-
-  const fetchRequests = useCallback(async () => {
-    const { data } = await supabase
-      .from('booking_requests')
-      .select(`
-        id,
-        guest_count,
-        total_amount,
-        status,
-        notes,
-        created_at,
-        layovers ( flight_number, passenger_count ),
-        airlines ( name )
-      `)
-      .eq('hotel_id', hotelId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-
-    if (data) {
-      setRequests(data as unknown as BookingRequest[])
-    }
-    setLoading(false)
-  }, [hotelId, supabase])
 
   useEffect(() => {
-    fetchRequests()
+    const supabase = createClient()
+
+    async function fetchEvents() {
+      const { data } = await supabase
+        .from('booking_requests')
+        .select('id, status, contact_name, created_at, confirmed_at')
+        .eq('hotel_id', hotelId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (data) {
+        setEvents(
+          data.map((b) => ({
+            id: b.id,
+            type: b.status,
+            message: `${b.contact_name ?? 'Guest'} — booking ${b.status}`,
+            time: b.confirmed_at ?? b.created_at,
+          }))
+        )
+      }
+      setLoading(false)
+    }
+
+    fetchEvents()
 
     const channel = supabase
-      .channel(`booking_requests:hotel_id=eq.${hotelId}`)
+      .channel(`hotel-events-${hotelId}`)
       .on(
         'postgres_changes',
         {
@@ -69,236 +68,47 @@ export function LiveEventFeed({ hotelId }: LiveEventFeedProps) {
           table: 'booking_requests',
           filter: `hotel_id=eq.${hotelId}`,
         },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newId = (payload.new as { id: string }).id
-            setAnimatingIds((prev) => new Set(prev).add(newId))
-            setTimeout(() => {
-              setAnimatingIds((prev) => {
-                const next = new Set(prev)
-                next.delete(newId)
-                return next
-              })
-            }, 600)
-          }
-          fetchRequests()
-        },
+        () => {
+          fetchEvents()
+        }
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotelId])
 
-  async function handleConfirm(id: string) {
-    await supabase
-      .from('booking_requests')
-      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
-      .eq('id', id)
-
-    setRequests((prev) => prev.filter((r) => r.id !== id))
-  }
-
-  async function handleNegotiate(id: string) {
-    if (negotiatingId === id) {
-      setNegotiatingId(null)
-      setNegotiateText('')
-    } else {
-      setNegotiatingId(id)
-      setNegotiateText('')
-    }
-  }
-
-  async function handleSendNegotiation(id: string) {
-    if (!negotiateText.trim()) return
-
-    await supabase
-      .from('booking_requests')
-      .update({ status: 'negotiating', notes: negotiateText.trim() })
-      .eq('id', id)
-
-    setNegotiatingId(null)
-    setNegotiateText('')
-    setRequests((prev) => prev.filter((r) => r.id !== id))
-  }
-
-  if (loading) {
-    return (
-      <div
-        className="rounded-xl p-6"
-        style={{
-          backgroundColor: '#111827',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
-        <div className="flex items-center gap-2">
-          <div className="h-3 w-3 animate-pulse rounded-full" style={{ backgroundColor: '#3B9EFF' }} />
-          <span className="text-sm" style={{ color: '#94A3B8' }}>Loading events…</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (requests.length === 0) {
-    return (
-      <div
-        className="flex flex-col items-center justify-center rounded-xl py-16"
-        style={{
-          backgroundColor: '#111827',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
-        <svg
-          width="64"
-          height="64"
-          viewBox="0 0 64 64"
-          fill="none"
-          className="mb-4 opacity-30"
-        >
-          <path
-            d="M32 8L8 48h48L32 8z"
-            stroke="#94A3B8"
-            strokeWidth="2"
-            fill="none"
-          />
-          <path
-            d="M20 36H8L32 8l24 28H44"
-            stroke="#94A3B8"
-            strokeWidth="2"
-            fill="none"
-          />
-          <line
-            x1="32"
-            y1="48"
-            x2="32"
-            y2="56"
-            stroke="#94A3B8"
-            strokeWidth="2"
-          />
-        </svg>
-        <p className="text-sm font-medium" style={{ color: '#94A3B8' }}>
-          All clear — no pending requests
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <div
-      className="overflow-hidden rounded-xl"
-      style={{
-        backgroundColor: '#111827',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
-    >
-      {requests.map((req) => (
-        <div
-          key={req.id}
-          className="p-4"
-          style={{
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            animation: animatingIds.has(req.id)
-              ? 'slide-in 0.4s ease-out'
-              : undefined,
-          }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <span
-                className="mt-1.5 block h-2 w-2 flex-shrink-0 rounded-full"
-                style={{
-                  backgroundColor: '#F5A623',
-                  boxShadow: '0 0 6px rgba(245,166,35,0.6)',
-                  animation: 'amber-pulse 2s ease-in-out infinite',
-                }}
-              />
-              <div>
-                <p className="text-sm font-semibold" style={{ color: '#F1F5F9' }}>
-                  {req.layovers?.flight_number ?? 'N/A'}
-                  <span className="ml-2 font-normal" style={{ color: '#94A3B8' }}>
-                    {req.airlines?.name ?? ''}
-                  </span>
-                </p>
-                <p className="mt-1 text-xs" style={{ color: '#94A3B8' }}>
-                  {req.layovers?.passenger_count ?? 0} pax · {req.guest_count} rooms requested
-                </p>
+    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <Bell className="h-5 w-5 text-[#3B9EFF]" />
+        <h3 className="text-sm font-semibold text-[#F1F5F9]">Live Event Feed</h3>
+        <span className="ml-auto flex h-2 w-2 rounded-full bg-[#22C55E]" />
+      </div>
+
+      {loading ? (
+        <p className="py-8 text-center text-sm text-[#94A3B8]">Loading events...</p>
+      ) : events.length === 0 ? (
+        <p className="py-8 text-center text-sm text-[#94A3B8]">No recent events</p>
+      ) : (
+        <ul className="space-y-3">
+          {events.map((event) => (
+            <li
+              key={event.id}
+              className="flex items-start gap-3 rounded-lg border border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.02)] p-3"
+            >
+              <div className="mt-0.5">
+                {iconMap[event.type] ?? <Bell className="h-4 w-4 text-[#94A3B8]" />}
               </div>
-            </div>
-
-            <p className="whitespace-nowrap text-sm font-bold" style={{ color: '#F1F5F9' }}>
-              {formatEuro(req.total_amount ?? 0)}
-            </p>
-          </div>
-
-          <div className="mt-3 flex items-center gap-2 pl-5">
-            <button
-              onClick={() => handleConfirm(req.id)}
-              className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#22C55E' }}
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => handleNegotiate(req.id)}
-              className="rounded-md px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
-              style={{
-                color: '#F5A623',
-                border: '1px solid #F5A623',
-                backgroundColor: 'transparent',
-              }}
-            >
-              Negotiate
-            </button>
-          </div>
-
-          {negotiatingId === req.id && (
-            <div className="mt-3 flex gap-2 pl-5">
-              <textarea
-                value={negotiateText}
-                onChange={(e) => setNegotiateText(e.target.value)}
-                placeholder="Enter your counter-offer or notes…"
-                rows={2}
-                className="flex-1 resize-none rounded-md px-3 py-2 text-xs outline-none placeholder:text-[#64748B]"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#F1F5F9',
-                }}
-              />
-              <button
-                onClick={() => handleSendNegotiation(req.id)}
-                className="self-end rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#F5A623' }}
-              >
-                Send
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
-
-      <style>{`
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateY(-12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes amber-pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.4;
-          }
-        }
-      `}</style>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[#F1F5F9]">{event.message}</p>
+                <p className="text-xs text-[#94A3B8]">{timeAgo(event.time)}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

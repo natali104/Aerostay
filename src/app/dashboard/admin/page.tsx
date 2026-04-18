@@ -1,272 +1,157 @@
-import Link from 'next/link'
-import {
-  Hotel,
-  Plane,
-  Clock,
-  CalendarCheck,
-  DollarSign,
-  Receipt,
-  Plus,
-  MapPin,
-  RefreshCw,
-} from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { StatCard } from '@/components/ui/stat-card'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { StatCard } from '@/components/dashboard/StatCard'
+import { formatEuro, formatDate } from '@/lib/format'
+import { Building2, Plane, AlertTriangle, DollarSign } from 'lucide-react'
+import { RevenueChart } from './revenue-chart'
+import { QuickActions } from './quick-actions'
 
-const layoverStatusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'default'> = {
-  detected: 'info',
-  notified: 'warning',
-  booking_in_progress: 'info',
-  booked: 'success',
-  expired: 'danger',
-  cancelled: 'danger',
-}
-
-const bookingStatusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'default'> = {
-  pending: 'warning',
-  confirmed: 'success',
-  negotiating: 'info',
-  rejected: 'danger',
-  cancelled: 'danger',
-  completed: 'success',
+const statusColors: Record<string, { bg: string; text: string }> = {
+  pending: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
+  confirmed: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
+  cancelled: { bg: 'bg-red-500/20', text: 'text-red-400' },
+  completed: { bg: 'bg-[#3B9EFF]/20', text: 'text-[#3B9EFF]' },
+  declined: { bg: 'bg-red-500/20', text: 'text-red-400' },
+  negotiating: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
+  booked: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
 }
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
 
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
   const [
-    { count: hotelsCount },
-    { count: airlinesCount },
-    { count: activeLayoversCount },
-    { count: bookingsCount },
-    { data: commissionTotals },
-    { data: recentLayovers },
-    { data: recentBookings },
+    hotelsRes,
+    airlinesRes,
+    layoversMonthRes,
+    commissionsRes,
+    recentBookingsRes,
   ] = await Promise.all([
-    supabase.from('hotels').select('*', { count: 'exact', head: true }),
-    supabase.from('airlines').select('*', { count: 'exact', head: true }),
+    supabase.from('hotels').select('id', { count: 'exact', head: true }),
+    supabase.from('airlines').select('id', { count: 'exact', head: true }),
     supabase
       .from('layovers')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['detected', 'notified', 'booking_in_progress']),
-    supabase.from('booking_requests').select('*', { count: 'exact', head: true }),
+      .select('id', { count: 'exact', head: true })
+      .gte('detected_at', monthStart),
     supabase
       .from('commissions')
-      .select('amount, status'),
-    supabase
-      .from('layovers')
-      .select('*, airport:airports(name, iata_code), airline:airlines(name)')
-      .order('detected_at', { ascending: false })
-      .limit(10),
+      .select('amount, status')
+      .neq('status', 'paid'),
     supabase
       .from('booking_requests')
-      .select('*, hotel:hotels(name), airline:airlines(name)')
+      .select(
+        'id, total_amount, status, created_at, hotel:hotels(name), airline:airlines(name)'
+      )
       .order('created_at', { ascending: false })
-      .limit(10),
+      .limit(15),
   ])
 
-  const totalRevenue = (commissionTotals ?? [])
-    .filter((c: any) => c.status === 'paid')
-    .reduce((sum: number, c: any) => sum + (c.amount ?? 0), 0)
+  const totalHotels = hotelsRes.count ?? 0
+  const totalAirlines = airlinesRes.count ?? 0
+  const layoversThisMonth = layoversMonthRes.count ?? 0
+  const platformRevenue = (commissionsRes.data ?? []).reduce(
+    (sum, c) => sum + (Number(c.amount) || 0),
+    0
+  )
 
-  const pendingCommissions = (commissionTotals ?? [])
-    .filter((c: any) => c.status === 'pending')
-    .reduce((sum: number, c: any) => sum + (c.amount ?? 0), 0)
+  const recentBookings = (recentBookingsRes.data ?? []).map((b) => {
+    const hotel = Array.isArray(b.hotel) ? b.hotel[0] : b.hotel
+    const airline = Array.isArray(b.airline) ? b.airline[0] : b.airline
+    return { ...b, _hotel: hotel as { name: string } | null, _airline: airline as { name: string } | null }
+  })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Platform overview and recent activity
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/admin/hotels">
-            <Button size="sm" variant="primary">
-              <Plus className="h-4 w-4" />
-              Add Hotel
-            </Button>
-          </Link>
-          <Link href="/dashboard/admin/airports">
-            <Button size="sm" variant="outline">
-              <MapPin className="h-4 w-4" />
-              Add Airport
-            </Button>
-          </Link>
-          <Link href="/api/cron/check-layovers">
-            <Button size="sm" variant="ghost">
-              <RefreshCw className="h-4 w-4" />
-              Trigger Layover Check
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#0B1120] p-6">
+      <DashboardHeader
+        title="Platform Overview"
+        subtitle="AeroStay administration panel"
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Hotels"
-          value={hotelsCount ?? 0}
-          icon={<Hotel className="h-5 w-5" />}
+          value={totalHotels}
+          icon={<Building2 className="h-5 w-5" />}
         />
         <StatCard
           label="Total Airlines"
-          value={airlinesCount ?? 0}
+          value={totalAirlines}
           icon={<Plane className="h-5 w-5" />}
         />
         <StatCard
-          label="Active Layovers"
-          value={activeLayoversCount ?? 0}
-          icon={<Clock className="h-5 w-5" />}
+          label="Layovers This Month"
+          value={layoversThisMonth}
+          icon={<AlertTriangle className="h-5 w-5" />}
         />
         <StatCard
-          label="Total Bookings"
-          value={bookingsCount ?? 0}
-          icon={<CalendarCheck className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Revenue"
-          value={formatCurrency(totalRevenue)}
+          label="Platform Revenue"
+          value={formatEuro(platformRevenue)}
           icon={<DollarSign className="h-5 w-5" />}
-        />
-        <StatCard
-          label="Pending Commissions"
-          value={formatCurrency(pendingCommissions)}
-          icon={<Receipt className="h-5 w-5" />}
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Recent Layovers</CardTitle>
-            <Link
-              href="/dashboard/admin/layovers"
-              className="text-sm font-medium text-[#38bdf8] hover:underline"
-            >
-              View all
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Flight</TableHead>
-                  <TableHead>Airport</TableHead>
-                  <TableHead>Airline</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Detected At</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(recentLayovers ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-gray-400 py-8">
-                      No layovers found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (recentLayovers ?? []).map((layover: any) => (
-                    <TableRow key={layover.id}>
-                      <TableCell className="font-medium">
-                        {layover.flight_number}
-                      </TableCell>
-                      <TableCell>
-                        {layover.airport?.iata_code ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        {layover.airline?.name ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={layoverStatusVariant[layover.status] ?? 'default'}>
-                          {layover.status?.replace(/_/g, ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-gray-500">
-                        {layover.detected_at
-                          ? formatDateTime(layover.detected_at)
-                          : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* Revenue Chart */}
+      <div className="mt-6">
+        <RevenueChart />
+      </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Recent Bookings</CardTitle>
-            <Link
-              href="/dashboard/admin/bookings"
-              className="text-sm font-medium text-[#38bdf8] hover:underline"
-            >
-              View all
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Hotel</TableHead>
-                  <TableHead>Airline</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(recentBookings ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-400 py-8">
-                      No bookings found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (recentBookings ?? []).map((booking: any) => (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-mono text-xs">
-                        {booking.id?.slice(0, 8)}
-                      </TableCell>
-                      <TableCell>{booking.hotel?.name ?? '—'}</TableCell>
-                      <TableCell>{booking.airline?.name ?? '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant={bookingStatusVariant[booking.status] ?? 'default'}>
-                          {booking.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {booking.total_amount
-                          ? formatCurrency(booking.total_amount)
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="text-gray-500">
-                        {booking.created_at
-                          ? formatDateTime(booking.created_at)
-                          : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* Recent Activity */}
+      <div className="mt-6 rounded-xl border border-white/[0.08] bg-[#111827] p-6">
+        <h2 className="mb-4 text-lg font-semibold text-[#F1F5F9]">
+          Recent Activity
+        </h2>
+        {recentBookings.length === 0 ? (
+          <p className="py-12 text-center text-sm text-[#94A3B8]">
+            No recent activity
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {recentBookings.map((b) => {
+              const colors =
+                statusColors[b.status] ?? statusColors.pending
+              return (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-[#0B1120] px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium text-[#F1F5F9]">
+                        {b._hotel?.name ?? 'Unknown Hotel'}
+                      </span>
+                      <span className="text-[#94A3B8]">·</span>
+                      <span className="text-[#94A3B8]">
+                        {b._airline?.name ?? 'Unknown Airline'}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-3 text-xs text-[#94A3B8]">
+                      {b.total_amount && (
+                        <span className="font-medium text-[#F1F5F9]">
+                          {formatEuro(Number(b.total_amount))}
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
+                      >
+                        {b.status?.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="ml-4 shrink-0 text-xs text-[#94A3B8]">
+                    {b.created_at ? formatDate(b.created_at) : '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="mt-6">
+        <QuickActions />
       </div>
     </div>
   )

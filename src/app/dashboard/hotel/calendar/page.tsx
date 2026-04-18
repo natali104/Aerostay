@@ -1,475 +1,317 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Modal,
-  ModalTitle,
-  ModalBody,
-  ModalFooter,
-} from '@/components/ui/modal'
-import { Tabs, TabList, Tab, TabPanel } from '@/components/ui/tabs'
-import { formatCurrency } from '@/lib/utils'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Save,
-  Lock,
-  Unlock,
-} from 'lucide-react'
-import {
-  addDays,
-  format,
-  startOfDay,
-  isToday,
-  isBefore,
-} from 'date-fns'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-interface RoomType {
+interface AvailabilityRow {
   id: string
-  name: string
-  total_rooms: number
-  base_price: number
-}
-
-interface AvailabilityEntry {
-  id?: string
   room_type_id: string
   date: string
-  available_rooms: number
-  total_rooms: number
-  price: number
+  available_count: number
+  price_per_night: number
   is_blocked: boolean
 }
 
-interface PendingChange {
-  room_type_id: string
+interface BookingCount {
   date: string
-  available_rooms: number
-  price: number
-  is_blocked: boolean
+  count: number
+}
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function getDaysInMonth(year: number, month: number): Date[] {
+  const days: Date[] = []
+  const d = new Date(year, month, 1)
+  while (d.getMonth() === month) {
+    days.push(new Date(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return days
+}
+
+function pad(n: number) {
+  return n.toString().padStart(2, '0')
+}
+
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function availColor(count: number): string {
+  if (count === 0) return 'text-red-400'
+  if (count <= 5) return 'text-[#F5A623]'
+  return 'text-[#22C55E]'
 }
 
 export default function CalendarPage() {
-  const supabase = createClient()
-
   const [hotelId, setHotelId] = useState<string | null>(null)
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
-  const [activeRoomType, setActiveRoomType] = useState<string>('')
-  const [availability, setAvailability] = useState<AvailabilityEntry[]>([])
-  const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map())
-  const [saving, setSaving] = useState(false)
+  const [year, setYear] = useState(() => new Date().getFullYear())
+  const [month, setMonth] = useState(() => new Date().getMonth())
+  const [availability, setAvailability] = useState<
+    Record<string, { total: number; id: string | null }>
+  >({})
+  const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
-  const [startDate, setStartDate] = useState(() => startOfDay(new Date()))
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const [editModal, setEditModal] = useState<{
-    open: boolean
-    date: string
-    entry: AvailabilityEntry | null
-  }>({ open: false, date: '', entry: null })
-  const [editPrice, setEditPrice] = useState('')
-  const [editAvailable, setEditAvailable] = useState('')
-  const [editBlocked, setEditBlocked] = useState(false)
+  const supabase = createClient()
 
-  const days = Array.from({ length: 30 }, (_, i) => addDays(startDate, i))
-
-  const loadData = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  const loadHotel = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('hotel_id')
       .eq('id', user.id)
       .single()
-    if (!profile?.hotel_id) return
-
-    setHotelId(profile.hotel_id)
-
-    const { data: types } = await supabase
-      .from('room_types')
-      .select('id, name, total_rooms, base_price')
-      .eq('hotel_id', profile.hotel_id)
-      .order('name')
-
-    if (types && types.length > 0) {
-      setRoomTypes(types)
-      if (!activeRoomType) {
-        setActiveRoomType(types[0].id)
-      }
-    }
-  }, [supabase, activeRoomType])
-
-  const loadAvailability = useCallback(async () => {
-    if (!hotelId || !activeRoomType) return
-    setLoading(true)
-
-    const dateFrom = format(startDate, 'yyyy-MM-dd')
-    const dateTo = format(addDays(startDate, 29), 'yyyy-MM-dd')
-
-    const { data } = await supabase
-      .from('room_availability')
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .eq('room_type_id', activeRoomType)
-      .gte('date', dateFrom)
-      .lte('date', dateTo)
-      .order('date')
-
-    setAvailability(data ?? [])
-    setLoading(false)
-  }, [supabase, hotelId, activeRoomType, startDate])
+    if (profile?.hotel_id) setHotelId(profile.hotel_id)
+  }, [supabase])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHotel()
+  }, [loadHotel])
+
+  const loadData = useCallback(async () => {
+    if (!hotelId) return
+    setLoading(true)
+
+    const days = getDaysInMonth(year, month)
+    const firstDay = toDateStr(days[0])
+    const lastDay = toDateStr(days[days.length - 1])
+
+    const { data: roomTypes } = await supabase
+      .from('room_types')
+      .select('id')
+      .eq('hotel_id', hotelId)
+
+    const rtIds = roomTypes?.map((r) => r.id) ?? []
+
+    if (rtIds.length === 0) {
+      setAvailability({})
+      setBookingCounts({})
+      setLoading(false)
+      return
+    }
+
+    const { data: availData } = await supabase
+      .from('room_availability')
+      .select('id, room_type_id, date, available_count, is_blocked')
+      .in('room_type_id', rtIds)
+      .gte('date', firstDay)
+      .lte('date', lastDay)
+      .eq('is_blocked', false)
+
+    const map: Record<string, { total: number; id: string | null }> = {}
+    for (const row of availData ?? []) {
+      if (!map[row.date]) map[row.date] = { total: 0, id: row.id }
+      map[row.date].total += row.available_count ?? 0
+    }
+    setAvailability(map)
+
+    const { data: bookings } = await supabase
+      .from('booking_requests')
+      .select('check_in')
+      .eq('hotel_id', hotelId)
+      .eq('status', 'confirmed')
+      .gte('check_in', firstDay)
+      .lte('check_in', lastDay)
+
+    const bMap: Record<string, number> = {}
+    for (const b of bookings ?? []) {
+      bMap[b.check_in] = (bMap[b.check_in] ?? 0) + 1
+    }
+    setBookingCounts(bMap)
+    setLoading(false)
+  }, [hotelId, year, month, supabase])
+
+  useEffect(() => {
     loadData()
   }, [loadData])
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadAvailability()
-  }, [loadAvailability])
-
-  function getEntryForDate(date: Date): AvailabilityEntry | undefined {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    return availability.find((a) => a.date === dateStr)
-  }
-
-  function getPendingForDate(date: Date): PendingChange | undefined {
-    const key = `${activeRoomType}:${format(date, 'yyyy-MM-dd')}`
-    return pendingChanges.get(key)
-  }
-
-  function getEffectiveData(date: Date) {
-    const pending = getPendingForDate(date)
-    const entry = getEntryForDate(date)
-    const roomType = roomTypes.find((r) => r.id === activeRoomType)
-    const totalRooms = roomType?.total_rooms ?? 0
-
-    if (pending) {
-      return {
-        available: pending.available_rooms,
-        price: pending.price,
-        blocked: pending.is_blocked,
-        totalRooms,
-      }
-    }
-
-    if (entry) {
-      return {
-        available: entry.available_rooms,
-        price: entry.price,
-        blocked: entry.is_blocked,
-        totalRooms: entry.total_rooms,
-      }
-    }
-
-    return {
-      available: totalRooms,
-      price: roomType?.base_price ?? 0,
-      blocked: false,
-      totalRooms,
+  function goPrev() {
+    if (month === 0) {
+      setMonth(11)
+      setYear((y) => y - 1)
+    } else {
+      setMonth((m) => m - 1)
     }
   }
 
-  function getCellColor(date: Date) {
-    if (isBefore(date, startOfDay(new Date())) && !isToday(date)) {
-      return 'bg-gray-50 text-gray-300'
+  function goNext() {
+    if (month === 11) {
+      setMonth(0)
+      setYear((y) => y + 1)
+    } else {
+      setMonth((m) => m + 1)
     }
-    const data = getEffectiveData(date)
-    if (data.blocked) return 'bg-red-50 border-red-200'
-    if (data.available === 0) return 'bg-red-50 border-red-200'
-    if (data.totalRooms > 0 && data.available / data.totalRooms <= 0.2)
-      return 'bg-amber-50 border-amber-200'
-    return 'bg-emerald-50/50 border-emerald-200'
   }
 
-  function openEditModal(date: Date) {
-    if (isBefore(date, startOfDay(new Date())) && !isToday(date)) return
-    const data = getEffectiveData(date)
-    const entry = getEntryForDate(date)
-    setEditPrice(data.price.toString())
-    setEditAvailable(data.available.toString())
-    setEditBlocked(data.blocked)
-    setEditModal({
-      open: true,
-      date: format(date, 'yyyy-MM-dd'),
-      entry: entry ?? null,
-    })
+  function openDay(dateStr: string) {
+    setSelectedDate(dateStr)
+    setEditValue(String(availability[dateStr]?.total ?? 0))
   }
 
-  function applyEdit() {
-    const key = `${activeRoomType}:${editModal.date}`
-    const newChanges = new Map(pendingChanges)
-    newChanges.set(key, {
-      room_type_id: activeRoomType,
-      date: editModal.date,
-      available_rooms: parseInt(editAvailable) || 0,
-      price: parseFloat(editPrice) || 0,
-      is_blocked: editBlocked,
-    })
-    setPendingChanges(newChanges)
-    setEditModal({ open: false, date: '', entry: null })
-  }
-
-  async function saveChanges() {
-    if (!hotelId || pendingChanges.size === 0) return
+  async function handleSave() {
+    if (!selectedDate || !hotelId) return
     setSaving(true)
 
-    const upserts = Array.from(pendingChanges.values()).map((change) => {
-      const roomType = roomTypes.find((r) => r.id === change.room_type_id)
-      return {
-        hotel_id: hotelId,
-        room_type_id: change.room_type_id,
-        date: change.date,
-        available_rooms: change.is_blocked ? 0 : change.available_rooms,
-        total_rooms: roomType?.total_rooms ?? 0,
-        price: change.price,
-        is_blocked: change.is_blocked,
-      }
-    })
+    const { data: roomTypes } = await supabase
+      .from('room_types')
+      .select('id')
+      .eq('hotel_id', hotelId)
+      .limit(1)
 
-    await supabase.from('room_availability').upsert(upserts, {
-      onConflict: 'hotel_id,room_type_id,date',
-    })
+    const rtId = roomTypes?.[0]?.id
+    if (rtId) {
+      await supabase.from('room_availability').upsert(
+        {
+          room_type_id: rtId,
+          date: selectedDate,
+          available_count: parseInt(editValue) || 0,
+          is_blocked: false,
+        },
+        { onConflict: 'room_type_id,date' }
+      )
+    }
 
-    setPendingChanges(new Map())
-    await loadAvailability()
     setSaving(false)
+    setSelectedDate(null)
+    loadData()
   }
 
-  const activeRoomTypeName =
-    roomTypes.find((r) => r.id === activeRoomType)?.name ?? 'Room'
+  const days = getDaysInMonth(year, month)
+  const firstDayOfWeek = (days[0].getDay() + 6) % 7
+  const monthName = new Date(year, month).toLocaleString('default', {
+    month: 'long',
+  })
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">
-            Calendar &amp; Pricing
-          </h1>
-          <p className="mt-1 text-gray-500">
-            Manage availability and rates per room type
-          </p>
+      <DashboardHeader
+        title="Availability Calendar"
+        subtitle="Manage daily room availability"
+      />
+
+      <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5">
+        <div className="mb-5 flex items-center justify-between">
+          <button
+            onClick={goPrev}
+            className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#3B9EFF]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <h2 className="text-lg font-semibold text-[#F1F5F9]">
+            {monthName} {year}
+          </h2>
+          <button
+            onClick={goNext}
+            className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#3B9EFF]"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
-        {pendingChanges.size > 0 && (
-          <Button onClick={saveChanges} loading={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            Save {pendingChanges.size} Change{pendingChanges.size > 1 ? 's' : ''}
-          </Button>
-        )}
+
+        <div className="grid grid-cols-7 gap-1">
+          {DAY_NAMES.map((d) => (
+            <div
+              key={d}
+              className="py-2 text-center text-xs font-medium text-[#94A3B8]"
+            >
+              {d}
+            </div>
+          ))}
+
+          {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+            <div key={`blank-${i}`} />
+          ))}
+
+          {loading
+            ? days.map((d) => (
+                <div
+                  key={d.toISOString()}
+                  className="min-h-[80px] animate-pulse rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-2"
+                />
+              ))
+            : days.map((d) => {
+                const dateStr = toDateStr(d)
+                const avail = availability[dateStr]?.total ?? 0
+                const bookings = bookingCounts[dateStr] ?? 0
+
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    onClick={() => openDay(dateStr)}
+                    className="group flex min-h-[80px] flex-col rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-2 text-left transition-all hover:border-[#3B9EFF]/30 hover:bg-[rgba(255,255,255,0.04)]"
+                  >
+                    <span className="text-xs text-[#94A3B8]">
+                      {d.getDate()}
+                    </span>
+                    <span
+                      className={`mt-auto text-lg font-bold ${availColor(avail)}`}
+                    >
+                      {avail}
+                    </span>
+                    {bookings > 0 && (
+                      <span className="mt-0.5 inline-flex w-fit items-center rounded-full bg-[#F5A623]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#F5A623]">
+                        {bookings} booking{bookings > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+        </div>
       </div>
 
-      {roomTypes.length > 0 ? (
-        <Tabs
-          defaultValue={roomTypes[0]?.id ?? ''}
-          value={activeRoomType}
-          onValueChange={setActiveRoomType}
-        >
-          <TabList>
-            {roomTypes.map((rt) => (
-              <Tab key={rt.id} value={rt.id}>
-                {rt.name}
-              </Tab>
-            ))}
-          </TabList>
-
-          {roomTypes.map((rt) => (
-            <TabPanel key={rt.id} value={rt.id}>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <CardTitle>{rt.name} - Next 30 Days</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setStartDate((d) => addDays(d, -7))
-                      }
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium text-gray-600">
-                      {format(startDate, 'MMM d')} -{' '}
-                      {format(addDays(startDate, 29), 'MMM d, yyyy')}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setStartDate((d) => addDays(d, 7))
-                      }
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4 flex gap-4 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded border border-emerald-300 bg-emerald-50" />
-                      Available
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded border border-amber-300 bg-amber-50" />
-                      Low availability
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-3 w-3 rounded border border-red-300 bg-red-50" />
-                      Blocked / Sold out
-                    </div>
-                  </div>
-
-                  {loading ? (
-                    <div className="flex items-center justify-center py-20 text-gray-400">
-                      Loading calendar...
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-7 gap-1">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(
-                        (d) => (
-                          <div
-                            key={d}
-                            className="py-2 text-center text-xs font-semibold uppercase text-gray-400"
-                          >
-                            {d}
-                          </div>
-                        )
-                      )}
-
-                      {(() => {
-                        const firstDay = days[0]
-                        const dayOfWeek = (firstDay.getDay() + 6) % 7
-                        const blanks = Array.from(
-                          { length: dayOfWeek },
-                          (_, i) => (
-                            <div key={`blank-${i}`} className="h-20" />
-                          )
-                        )
-
-                        const dayCells = days.map((date) => {
-                          const data = getEffectiveData(date)
-                          const isPast =
-                            isBefore(date, startOfDay(new Date())) &&
-                            !isToday(date)
-                          const hasPending = !!getPendingForDate(date)
-
-                          return (
-                            <button
-                              key={date.toISOString()}
-                              type="button"
-                              disabled={isPast}
-                              onClick={() => openEditModal(date)}
-                              className={`relative flex h-20 flex-col items-start rounded-lg border p-1.5 text-left transition-all ${getCellColor(date)} ${
-                                isPast
-                                  ? 'cursor-not-allowed opacity-50'
-                                  : 'cursor-pointer hover:ring-2 hover:ring-[#38bdf8]/40'
-                              } ${isToday(date) ? 'ring-2 ring-[#1e3a5f]' : ''} ${hasPending ? 'ring-2 ring-amber-400' : ''}`}
-                            >
-                              <span
-                                className={`text-xs font-medium ${
-                                  isToday(date)
-                                    ? 'text-[#1e3a5f]'
-                                    : 'text-gray-600'
-                                }`}
-                              >
-                                {format(date, 'd')}
-                              </span>
-                              <span className="mt-auto text-[10px] font-medium text-gray-500">
-                                {data.available}/{data.totalRooms} rooms
-                              </span>
-                              <span className="text-xs font-semibold text-[#1e3a5f]">
-                                {formatCurrency(data.price)}
-                              </span>
-                              {data.blocked && (
-                                <Lock className="absolute right-1 top-1 h-3 w-3 text-red-500" />
-                              )}
-                            </button>
-                          )
-                        })
-
-                        return [...blanks, ...dayCells]
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabPanel>
-          ))}
-        </Tabs>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-gray-400">
-            No room types configured. Add room types first.
-          </CardContent>
-        </Card>
-      )}
-
-      <Modal
-        open={editModal.open}
-        onClose={() => setEditModal({ open: false, date: '', entry: null })}
-      >
-        <ModalTitle>
-          Edit {activeRoomTypeName} — {editModal.date && format(new Date(editModal.date + 'T00:00:00'), 'EEE, MMM d, yyyy')}
-        </ModalTitle>
-        <ModalBody className="space-y-4">
-          <Input
-            label="Price per Night"
-            type="number"
-            step="0.01"
-            min="0"
-            value={editPrice}
-            onChange={(e) => setEditPrice(e.target.value)}
-          />
-          <Input
-            label="Available Rooms"
-            type="number"
-            min="0"
-            max={roomTypes.find((r) => r.id === activeRoomType)?.total_rooms ?? 999}
-            value={editAvailable}
-            onChange={(e) => setEditAvailable(e.target.value)}
-          />
-          <div className="flex items-center gap-3">
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="relative w-full max-w-sm rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
             <button
-              type="button"
-              onClick={() => setEditBlocked(!editBlocked)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${editBlocked ? 'bg-red-500' : 'bg-gray-200'}`}
+              onClick={() => setSelectedDate(null)}
+              className="absolute right-3 top-3 text-[#94A3B8] hover:text-[#F1F5F9]"
             >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform ${editBlocked ? 'translate-x-5' : 'translate-x-0'}`}
-              />
+              <X className="h-5 w-5" />
             </button>
-            <span className="flex items-center gap-1.5 text-sm text-gray-700">
-              {editBlocked ? (
-                <>
-                  <Lock className="h-4 w-4 text-red-500" /> Blocked
-                </>
-              ) : (
-                <>
-                  <Unlock className="h-4 w-4 text-emerald-500" /> Available
-                </>
-              )}
-            </span>
+
+            <h3 className="mb-1 text-lg font-semibold text-[#F1F5F9]">
+              {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </h3>
+            <p className="mb-5 text-sm text-[#94A3B8]">
+              Current availability: {availability[selectedDate]?.total ?? 0}{' '}
+              rooms
+            </p>
+
+            <label className="mb-2 block text-sm font-medium text-[#94A3B8]">
+              Available Rooms
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="mb-5 w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#0A0F1E] px-3 py-2 text-[#F1F5F9] outline-none focus:border-[#3B9EFF] focus:ring-1 focus:ring-[#3B9EFF]"
+            />
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full rounded-lg bg-[#3B9EFF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3B9EFF]/90 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            variant="ghost"
-            onClick={() =>
-              setEditModal({ open: false, date: '', entry: null })
-            }
-          >
-            Cancel
-          </Button>
-          <Button onClick={applyEdit}>Apply</Button>
-        </ModalFooter>
-      </Modal>
+        </div>
+      )}
     </div>
   )
 }
