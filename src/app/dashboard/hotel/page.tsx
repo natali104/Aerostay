@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { LiveEventFeed } from '@/components/dashboard/LiveEventFeed'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { CrisisRadarLive } from '@/components/dashboard/CrisisRadarLive'
 import { formatEuro, formatDate } from '@/lib/format'
 import { BedDouble, Clock, DollarSign, TrendingUp, Plane } from 'lucide-react'
 import { RevenueChart } from './revenue-chart'
@@ -100,6 +101,25 @@ export default async function HotelDashboardPage() {
         title="Hotel Overview"
         subtitle="Real-time monitoring of your property"
       />
+
+      {/* Crisis Radar */}
+      <div className="mb-6 flex justify-center">
+        <div
+          className="w-full max-w-sm rounded-xl p-6"
+          style={{
+            backgroundColor: '#111827',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <h3
+            className="mb-4 text-center text-xs font-medium uppercase tracking-[0.1em]"
+            style={{ color: '#94A3B8' }}
+          >
+            Crisis Radar — SOF Airport
+          </h3>
+          <CrisisRadarLive />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

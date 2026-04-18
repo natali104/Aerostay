@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { StatCard } from '@/components/dashboard/StatCard'
+import { CrisisRadarLive } from '@/components/dashboard/CrisisRadarLive'
 import { formatDate } from '@/lib/format'
 import { AlertTriangle, BedDouble, Clock, Users, Star, ArrowRight } from 'lucide-react'
 
@@ -102,6 +103,25 @@ export default async function AirlineDashboardPage() {
         title="Airline Operations"
         subtitle="Monitor layovers and bookings in real-time"
       />
+
+      {/* Crisis Radar */}
+      <div className="mb-6 flex justify-center">
+        <div
+          className="w-full max-w-sm rounded-xl p-6"
+          style={{
+            backgroundColor: '#111827',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <h3
+            className="mb-4 text-center text-xs font-medium uppercase tracking-[0.1em]"
+            style={{ color: '#94A3B8' }}
+          >
+            Crisis Radar — SOF Airport
+          </h3>
+          <CrisisRadarLive />
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
