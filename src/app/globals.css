@@ -98,6 +98,66 @@ body {
   }
 }
 
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.shimmer-loading {
+  background: linear-gradient(90deg, #1a2035 25%, #1e2842 50%, #1a2035 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes stat-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-value-fade-in {
+  animation: stat-fade-in 0.5s ease-out;
+}
+
+@keyframes booking-row-in {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.booking-row-new {
+  animation: booking-row-in 400ms ease-out;
+}
+
+@keyframes booking-glow {
+  0% { box-shadow: 0 0 0 1px rgba(245,162,35,0.5); }
+  100% { box-shadow: 0 0 0 1px transparent; }
+}
+
+.booking-glow {
+  animation: booking-glow 3s ease-out forwards;
+}
+
+@keyframes activity-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.activity-ticker-scroll {
+  display: inline-block;
+  animation: activity-scroll 30s linear infinite;
+}
+
+.activity-ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-loading { animation: none; background: #1a2035; }
+  .stat-value-fade-in { animation: none; }
+  .booking-row-new { animation: none; }
+  .booking-glow { animation: none; }
+  .activity-ticker-scroll { animation: none; }
+}
+
 .ticker-scroll {
   display: inline-block;
   animation: ticker-scroll 40s linear infinite;

@@ -127,24 +127,28 @@ export default async function HotelDashboardPage() {
           value={availableRooms}
           subtitle={`of ${totalRooms} total`}
           icon={<BedDouble className="h-5 w-5" />}
+          trend={{ value: 12, positive: true }}
         />
         <StatCard
           title="Pending Requests"
           value={pendingCount}
           subtitle="awaiting response"
           icon={<Clock className="h-5 w-5" />}
+          trend={{ value: 23, positive: true }}
         />
         <StatCard
           title="This Month Revenue"
           value={formatEuro(monthRevenue)}
           subtitle="confirmed bookings"
           icon={<DollarSign className="h-5 w-5" />}
+          trend={{ value: 8, positive: true }}
         />
         <StatCard
           title="Occupancy Rate"
           value={`${occupancyRate}%`}
           subtitle="today"
           icon={<TrendingUp className="h-5 w-5" />}
+          trend={{ value: 15, positive: true }}
         />
       </div>
 
