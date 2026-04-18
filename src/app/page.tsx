@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react'
+import HeroSection from '@/components/HeroSection'
 
 const NAV_LINKS = [
   { label: 'How It Works', href: '#how-it-works' },
@@ -157,56 +158,7 @@ export default function HomePage() {
       </header>
 
       {/* ───── Hero ───── */}
-      <section className="relative flex items-center justify-center pt-32 pb-24 md:pt-44 md:pb-36 bg-gradient-to-br from-primary via-primary-dark to-[#0f2133] overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.07]">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-accent rounded-full blur-[120px]" />
-          <div className="absolute bottom-10 right-20 w-96 h-96 bg-accent-light rounded-full blur-[150px]" />
-        </div>
-
-        <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-accent-light backdrop-blur-sm">
-            <Plane className="h-4 w-4" />
-            <span>B2B Layover Management Platform</span>
-          </div>
-
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.1]">
-            Streamline Airline{' '}
-            <span className="text-accent">Layover Hotel Bookings</span>
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/60 leading-relaxed">
-            Eliminate the chaos of phone calls, faxes, and last-minute
-            scrambling. AeroStay connects airlines with partner hotels in
-            real&nbsp;time — so every layover is handled seamlessly.
-          </p>
-
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link
-              href="/signup"
-              className="btn-primary text-base px-8 py-3.5"
-            >
-              Get Started
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <a href="#how-it-works" className="btn-secondary text-base px-8 py-3.5">
-              Learn More
-            </a>
-          </div>
-
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-md mx-auto">
-            {[
-              { value: '50+', label: 'Partner Hotels' },
-              { value: '24/7', label: 'Availability' },
-              { value: '< 2min', label: 'Avg. Booking' },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-2xl font-bold text-accent">{stat.value}</p>
-                <p className="mt-1 text-xs text-white/50">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* ───── Trusted By ───── */}
       <section className="border-b border-gray-100 bg-gray-50/60 py-10">
