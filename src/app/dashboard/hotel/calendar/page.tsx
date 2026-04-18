@@ -5,20 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-interface AvailabilityRow {
-  id: string
-  room_type_id: string
-  date: string
-  available_count: number
-  price_per_night: number
-  is_blocked: boolean
-}
-
-interface BookingCount {
-  date: string
-  count: number
-}
-
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function getDaysInMonth(year: number, month: number): Date[] {
@@ -73,6 +59,7 @@ export default function CalendarPage() {
   }, [supabase])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadHotel()
   }, [loadHotel])
 
@@ -130,6 +117,7 @@ export default function CalendarPage() {
   }, [hotelId, year, month, supabase])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData()
   }, [loadData])
 

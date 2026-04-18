@@ -1,64 +1,46 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import {
-  Building2,
-  MapPin,
-  Phone,
-  Mail,
-  Globe,
-  Save,
-  Settings2,
-  Percent,
-  Info,
-} from 'lucide-react'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { formatEuro } from '@/lib/format'
+import { Edit3, RefreshCw, Globe } from 'lucide-react'
 
 interface Hotel {
   id: string
   name: string
-  address: string
-  city: string
-  country: string
-  description: string | null
-  amenities: string[]
-  contact_email: string | null
-  contact_phone: string | null
-  website: string | null
   pricing_method: string
-  partner_discount: number | null
+  partner_discount_pct: number | null
   commission_rate: number | null
-  star_rating: number | null
 }
 
-const HOTEL_AMENITIES = [
-  'Pool',
-  'Gym',
-  'Spa',
-  'Restaurant',
-  'Bar',
-  'Business Center',
-  'Parking',
-  'Airport Shuttle',
-  'Concierge',
-  'Laundry Service',
-  'Room Service',
-  '24h Front Desk',
-  'Meeting Rooms',
-  'Luggage Storage',
-  'Pet Friendly',
-  'EV Charging',
-]
+interface Commission {
+  id: string
+  amount: number
+  rate: number
+  status: string
+  billing_period: string
+}
 
-const PRICING_METHODS = [
-  { value: 'manual', label: 'Manual Pricing' },
-  { value: 'booking_com', label: 'Booking.com Integration' },
-  { value: 'channel_manager', label: 'Channel Manager' },
+const pricingOptions = [
+  {
+    value: 'manual',
+    label: 'Manual Pricing',
+    desc: 'Set your own rates per room type',
+    Icon: Edit3,
+  },
+  {
+    value: 'channel_manager',
+    label: 'Channel Manager',
+    desc: 'Sync from your channel manager',
+    Icon: RefreshCw,
+  },
+  {
+    value: 'booking_com',
+    label: 'Booking.com Sync',
+    desc: 'Auto-sync with Booking.com rates',
+    Icon: Globe,
+  },
 ]
 
 export default function SettingsPage() {
@@ -69,23 +51,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [country, setCountry] = useState('')
-  const [description, setDescription] = useState('')
-  const [amenities, setAmenities] = useState<string[]>([])
-  const [contactEmail, setContactEmail] = useState('')
-  const [contactPhone, setContactPhone] = useState('')
-  const [website, setWebsite] = useState('')
   const [pricingMethod, setPricingMethod] = useState('manual')
-  const [partnerDiscount, setPartnerDiscount] = useState('0')
+  const [manualPrice, setManualPrice] = useState('')
+  const [discount, setDiscount] = useState(10)
+
+  const [commissionTotal, setCommissionTotal] = useState(0)
+  const [commissions, setCommissions] = useState<Commission[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const { data: profile } = await supabase
@@ -94,7 +69,10 @@ export default function SettingsPage() {
       .eq('id', user.id)
       .single()
 
-    if (!profile?.hotel_id) return
+    if (!profile?.hotel_id) {
+      setLoading(false)
+      return
+    }
 
     const { data: hotelData } = await supabase
       .from('hotels')
@@ -104,18 +82,25 @@ export default function SettingsPage() {
 
     if (hotelData) {
       setHotel(hotelData)
-      setName(hotelData.name ?? '')
-      setAddress(hotelData.address ?? '')
-      setCity(hotelData.city ?? '')
-      setCountry(hotelData.country ?? '')
-      setDescription(hotelData.description ?? '')
-      setAmenities(hotelData.amenities ?? [])
-      setContactEmail(hotelData.contact_email ?? '')
-      setContactPhone(hotelData.contact_phone ?? '')
-      setWebsite(hotelData.website ?? '')
       setPricingMethod(hotelData.pricing_method ?? 'manual')
-      setPartnerDiscount((hotelData.partner_discount ?? 0).toString())
+      setDiscount(hotelData.partner_discount_pct ?? 10)
     }
+
+    const { data: commData } = await supabase
+      .from('commissions')
+      .select('id, amount, rate, status, billing_period')
+      .eq('hotel_id', profile.hotel_id)
+      .order('billing_period', { ascending: false })
+      .limit(5)
+
+    if (commData) {
+      setCommissions(commData)
+      const unpaid = commData
+        .filter((c) => c.status !== 'paid')
+        .reduce((s, c) => s + (c.amount ?? 0), 0)
+      setCommissionTotal(unpaid)
+    }
+
     setLoading(false)
   }, [supabase])
 
@@ -124,37 +109,16 @@ export default function SettingsPage() {
     loadData()
   }, [loadData])
 
-  function toggleAmenity(amenity: string) {
-    setAmenities((prev) =>
-      prev.includes(amenity)
-        ? prev.filter((a) => a !== amenity)
-        : [...prev, amenity]
-    )
-  }
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave() {
     if (!hotel) return
     setSaving(true)
-    setSaved(false)
 
     await supabase
       .from('hotels')
       .update({
-        name,
-        address,
-        city,
-        country,
-        description: description || null,
-        amenities,
-        contact_email: contactEmail || null,
-        contact_phone: contactPhone || null,
-        website: website || null,
         pricing_method: pricingMethod,
-        partner_discount:
-          pricingMethod === 'booking_com'
-            ? parseFloat(partnerDiscount) || 0
-            : null,
+        partner_discount_pct:
+          pricingMethod === 'booking_com' ? discount : null,
       })
       .eq('id', hotel.id)
 
@@ -163,224 +127,220 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000)
   }
 
+  const basePrice = 120
+  const discountedPrice = Math.round(basePrice * (1 - discount / 100))
+
   if (loading) {
     return (
-      <div className="py-20 text-center text-gray-400">Loading settings...</div>
+      <div className="py-20 text-center text-[#94A3B8]">
+        Loading settings...
+      </div>
     )
   }
 
   if (!hotel) {
     return (
-      <div className="py-20 text-center text-gray-400">
-        Hotel not found
-      </div>
+      <div className="py-20 text-center text-[#94A3B8]">Hotel not found</div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Hotel Settings</h1>
-          <p className="mt-1 text-gray-500">
-            Manage your hotel profile and configuration
-          </p>
-        </div>
-        {saved && (
-          <Badge variant="success" className="text-sm">
-            Settings saved successfully
-          </Badge>
-        )}
-      </div>
+      <DashboardHeader
+        title="Settings"
+        subtitle="Configure pricing and preferences"
+      />
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-[#38bdf8]" />
-              Hotel Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              label="Hotel Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              label="Address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              icon={<MapPin className="h-4 w-4" />}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="City"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-              />
-              <Input
-                label="Country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <textarea
-                className="flex min-h-[100px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition-colors placeholder:text-gray-400 focus:border-[#38bdf8] focus:outline-none focus:ring-2 focus:ring-[#38bdf8]/30"
-                placeholder="Describe your hotel, location, and unique selling points..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Pricing Configuration */}
+        <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6">
+          <h3 className="mb-5 text-base font-semibold text-[#F1F5F9]">
+            Pricing Configuration
+          </h3>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Amenities</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {HOTEL_AMENITIES.map((amenity) => (
+          <div className="space-y-3">
+            {pricingOptions.map((opt) => {
+              const selected = pricingMethod === opt.value
+              return (
                 <button
-                  key={amenity}
+                  key={opt.value}
                   type="button"
-                  onClick={() => toggleAmenity(amenity)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    amenities.includes(amenity)
-                      ? 'border-[#38bdf8] bg-[#38bdf8]/10 text-[#1e3a5f]'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  onClick={() => setPricingMethod(opt.value)}
+                  className={`flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-all ${
+                    selected
+                      ? 'border-[#3B9EFF] bg-[#3B9EFF]/5'
+                      : 'border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)]'
                   }`}
                 >
-                  {amenity}
+                  <div
+                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                      selected
+                        ? 'border-[#3B9EFF]'
+                        : 'border-[#94A3B8]'
+                    }`}
+                  >
+                    {selected && (
+                      <div className="h-2 w-2 rounded-full bg-[#3B9EFF]" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <opt.Icon
+                        className={`h-4 w-4 ${
+                          selected ? 'text-[#3B9EFF]' : 'text-[#94A3B8]'
+                        }`}
+                      />
+                      <span className="text-sm font-medium text-[#F1F5F9]">
+                        {opt.label}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#94A3B8]">{opt.desc}</p>
+                  </div>
                 </button>
-              ))}
+              )
+            })}
+          </div>
+
+          {pricingMethod === 'manual' && (
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-medium text-[#94A3B8]">
+                Price per room per night (&euro;)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="e.g. 95"
+                className="w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#0A0F1E] px-3 py-2 text-[#F1F5F9] outline-none placeholder:text-[#475569] focus:border-[#3B9EFF] focus:ring-1 focus:ring-[#3B9EFF]"
+              />
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-[#38bdf8]" />
-              Pricing Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Select
-              label="Pricing Method"
-              value={pricingMethod}
-              onChange={(e) => setPricingMethod(e.target.value)}
-              options={PRICING_METHODS}
-            />
-
-            {pricingMethod === 'booking_com' && (
-              <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-4">
-                <p className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1e3a5f]">
-                  <Percent className="h-4 w-4" />
-                  Booking.com Partner Discount
-                </p>
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={partnerDiscount}
-                  onChange={(e) => setPartnerDiscount(e.target.value)}
-                  placeholder="e.g. 15"
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  Percentage discount off Booking.com public rates offered to
-                  airline partners through AeroStay
-                </p>
-              </div>
-            )}
-
-            {pricingMethod === 'channel_manager' && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-                <p className="flex items-center gap-2 text-sm text-amber-700">
-                  <Info className="h-4 w-4" />
-                  Channel Manager rates are synchronized automatically. Contact
-                  support to configure your integration.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Percent className="h-5 w-5 text-[#38bdf8]" />
-              Commission Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">
-                    Platform Commission
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Set by AeroStay admin. Contact support for adjustments.
-                  </p>
-                </div>
-                <p className="text-2xl font-bold text-[#1e3a5f]">
-                  {hotel.commission_rate != null
-                    ? `${(hotel.commission_rate * 100).toFixed(1)}%`
-                    : 'Not set'}
-                </p>
+          {pricingMethod === 'booking_com' && (
+            <div className="mt-5 space-y-3">
+              <label className="block text-sm font-medium text-[#94A3B8]">
+                Partner Discount: {discount}%
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={30}
+                value={discount}
+                onChange={(e) => setDiscount(Number(e.target.value))}
+                className="w-full accent-[#3B9EFF]"
+              />
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-[#94A3B8]">
+                  Base: &euro;{basePrice}
+                </span>
+                <span className="text-[#F1F5F9]">&rarr;</span>
+                <span className="font-semibold text-[#3B9EFF]">
+                  Your price: &euro;{discountedPrice}
+                </span>
+                <span className="text-xs text-[#94A3B8]">
+                  ({discount}% discount applied)
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-[#38bdf8]" />
-              Contact Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              label="Contact Email"
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              icon={<Mail className="h-4 w-4" />}
-            />
-            <Input
-              label="Contact Phone"
-              type="tel"
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              icon={<Phone className="h-4 w-4" />}
-            />
-            <Input
-              label="Website"
-              type="url"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              icon={<Globe className="h-4 w-4" />}
-              placeholder="https://..."
-            />
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end">
-          <Button type="submit" size="lg" loading={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Settings
-          </Button>
+          )}
         </div>
-      </form>
+
+        {/* Commission & Billing */}
+        <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6">
+          <h3 className="mb-5 text-base font-semibold text-[#F1F5F9]">
+            Commission &amp; Billing
+          </h3>
+
+          <div className="mb-5 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4">
+            <p className="text-sm text-[#94A3B8]">Commission Rate</p>
+            <p className="mt-1 text-2xl font-bold text-[#F1F5F9]">
+              {hotel.commission_rate != null
+                ? `${(hotel.commission_rate * 100).toFixed(0)}%`
+                : '8%'}
+            </p>
+            <p className="mt-1 text-xs text-[#94A3B8]">
+              Billed monthly by AeroStay
+            </p>
+          </div>
+
+          <div className="mb-5 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4">
+            <p className="text-sm text-[#94A3B8]">
+              This Month&apos;s Commission
+            </p>
+            <p className="mt-1 text-2xl font-bold text-[#F5A623]">
+              {formatEuro(commissionTotal)}
+            </p>
+          </div>
+
+          {commissions.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                    <th className="px-2 py-2 text-left text-xs font-medium text-[#94A3B8]">
+                      Period
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-[#94A3B8]">
+                      Amount
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-[#94A3B8]">
+                      Rate
+                    </th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-[#94A3B8]">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissions.map((c) => (
+                    <tr
+                      key={c.id}
+                      className="border-b border-[rgba(255,255,255,0.04)]"
+                    >
+                      <td className="px-2 py-2 text-[#F1F5F9]">
+                        {c.billing_period}
+                      </td>
+                      <td className="px-2 py-2 text-[#F1F5F9]">
+                        {formatEuro(c.amount)}
+                      </td>
+                      <td className="px-2 py-2 text-[#94A3B8]">
+                        {(c.rate * 100).toFixed(0)}%
+                      </td>
+                      <td className="px-2 py-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            c.status === 'paid'
+                              ? 'bg-[#22C55E]/10 text-[#22C55E]'
+                              : 'bg-[#F5A623]/10 text-[#F5A623]'
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-[#3B9EFF] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#3B9EFF]/90 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+        {saved && (
+          <span className="text-sm font-medium text-[#22C55E]">
+            Settings saved successfully
+          </span>
+        )}
+      </div>
     </div>
   )
 }
