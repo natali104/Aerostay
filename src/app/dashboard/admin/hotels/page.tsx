@@ -12,6 +12,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/server'
+import { DEMO_MODE } from '@/lib/demo'
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
   active: 'success',
@@ -30,37 +31,69 @@ function StarRating({ stars }: { stars: number }) {
   )
 }
 
+function DemoFallback() {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+      <p className="text-sm text-[#64748B]">
+        Demo mode — data will appear when connected to production database
+      </p>
+    </div>
+  )
+}
+
 export default async function AdminHotelsPage({
   searchParams,
 }: {
   searchParams: Promise<{ search?: string; status?: string }>
 }) {
-  const params = await searchParams
-  const supabase = await createClient()
+  let hotels: any[] | null = null
+  let params: { search?: string; status?: string } = {}
 
-  let query = supabase
-    .from('hotels')
-    .select('*, airport:airports(name, iata_code)')
-    .order('name', { ascending: true })
+  try {
+    params = await searchParams
+    const supabase = await createClient()
 
-  if (params.search) {
-    query = query.or(
-      `name.ilike.%${params.search}%,city.ilike.%${params.search}%`
-    )
+    let query = supabase
+      .from('hotels')
+      .select('*, airport:airports(name, iata_code)')
+      .order('name', { ascending: true })
+
+    if (params.search) {
+      query = query.or(
+        `name.ilike.%${params.search}%,city.ilike.%${params.search}%`
+      )
+    }
+
+    if (params.status) {
+      query = query.eq('status', params.status)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    hotels = data
+  } catch {
+    if (DEMO_MODE) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F172A]">Hotels</h1>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Manage partner hotels across all airports
+            </p>
+          </div>
+          <DemoFallback />
+        </div>
+      )
+    }
+    hotels = []
   }
-
-  if (params.status) {
-    query = query.eq('status', params.status)
-  }
-
-  const { data: hotels } = await query
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Hotels</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-[#0F172A]">Hotels</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Manage partner hotels across all airports
           </p>
         </div>
@@ -114,7 +147,7 @@ export default async function AdminHotelsPage({
                     <TableCell>
                       {hotel.airport ? (
                         <span className="inline-flex items-center gap-1">
-                          <span className="rounded bg-[#1e3a5f]/10 px-1.5 py-0.5 text-xs font-semibold text-[#1e3a5f]">
+                          <span className="rounded bg-[#0F172A]/10 px-1.5 py-0.5 text-xs font-semibold text-[#0F172A]">
                             {hotel.airport.iata_code}
                           </span>
                           <span className="hidden text-gray-500 lg:inline">
@@ -153,7 +186,7 @@ export default async function AdminHotelsPage({
                     <TableCell>
                       <Link
                         href={`/dashboard/admin/hotels/${hotel.id}`}
-                        className="inline-flex items-center gap-1 text-sm text-[#38bdf8] hover:underline"
+                        className="inline-flex items-center gap-1 text-sm text-[#0EA5E9] hover:underline"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         View
@@ -186,13 +219,13 @@ function HotelFilters({
           name="search"
           defaultValue={currentSearch}
           placeholder="Search hotels..."
-          className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-[#38bdf8] focus:outline-none focus:ring-2 focus:ring-[#38bdf8]/30 sm:w-56"
+          className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-[#0EA5E9] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 sm:w-56"
         />
       </div>
       <select
         name="status"
         defaultValue={currentStatus ?? ''}
-        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#38bdf8] focus:outline-none focus:ring-2 focus:ring-[#38bdf8]/30"
+        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#0EA5E9] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
       >
         <option value="">All Statuses</option>
         <option value="active">Active</option>
@@ -202,7 +235,7 @@ function HotelFilters({
       </select>
       <button
         type="submit"
-        className="h-9 rounded-lg bg-[#1e3a5f] px-4 text-sm font-medium text-white hover:bg-[#162d4a] transition-colors"
+        className="h-9 rounded-lg bg-[#0EA5E9] px-4 text-sm font-medium text-white hover:bg-[#0284C7] transition-colors"
       >
         Filter
       </button>

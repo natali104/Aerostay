@@ -1,205 +1,180 @@
-import { createClient } from '@/lib/supabase/server'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { StatCard } from '@/components/ui/stat-card'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
-import { formatCurrency } from '@/lib/utils'
-import {
-  DollarSign,
-  Clock,
-  FileText,
-  CheckCircle2,
-  TrendingUp,
-} from 'lucide-react'
+'use client'
 
-export default async function CommissionsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('hotel_id')
-    .eq('id', user!.id)
-    .single()
-  const hotelId = profile!.hotel_id
+import { DEMO_MODE, DEMO_HOTEL } from '@/lib/demo'
+import { formatEuro } from '@/lib/format'
+import AeroStatCard from '@/components/ui/AeroStatCard'
+import StatusBadge from '@/components/ui/StatusBadge'
+import { DollarSign, Clock, FileText, CheckCircle2, TrendingUp } from 'lucide-react'
 
-  const { data: commissions } = await supabase
-    .from('commissions')
-    .select(
-      '*, booking:bookings(id, check_in, check_out, total_amount, airline:airlines(name))'
-    )
-    .eq('hotel_id', hotelId)
-    .order('created_at', { ascending: false })
+const demoCommissions = [
+  { id: 'c1', period: '2026-04', amount: 391, rate: 0.08, status: 'pending', bookingRef: 'BK-2841', airline: 'Wizz Air', bookingAmount: 4892 },
+  { id: 'c2', period: '2026-03', amount: 523, rate: 0.08, status: 'billed', bookingRef: 'BK-2738', airline: 'Bulgaria Air', bookingAmount: 6538 },
+  { id: 'c3', period: '2026-02', amount: 289, rate: 0.08, status: 'paid', bookingRef: 'BK-2654', airline: 'Turkish Airlines', bookingAmount: 3613 },
+  { id: 'c4', period: '2026-01', amount: 412, rate: 0.08, status: 'paid', bookingRef: 'BK-2501', airline: 'Austrian Airlines', bookingAmount: 5150 },
+  { id: 'c5', period: '2025-12', amount: 678, rate: 0.08, status: 'paid', bookingRef: 'BK-2389', airline: 'Ryanair', bookingAmount: 8475 },
+]
 
-  const allCommissions = commissions ?? []
+const totalOwed = demoCommissions.reduce((s, c) => s + c.amount, 0)
+const pendingAmount = demoCommissions.filter((c) => c.status === 'pending').reduce((s, c) => s + c.amount, 0)
+const billedAmount = demoCommissions.filter((c) => c.status === 'billed').reduce((s, c) => s + c.amount, 0)
+const paidAmount = demoCommissions.filter((c) => c.status === 'paid').reduce((s, c) => s + c.amount, 0)
 
-  const totalOwed = allCommissions.reduce(
-    (sum, c) => sum + (c.amount ?? 0),
-    0
-  )
-  const pendingAmount = allCommissions
-    .filter((c) => c.status === 'pending')
-    .reduce((sum, c) => sum + (c.amount ?? 0), 0)
-  const billedAmount = allCommissions
-    .filter((c) => c.status === 'billed')
-    .reduce((sum, c) => sum + (c.amount ?? 0), 0)
-  const paidAmount = allCommissions
-    .filter((c) => c.status === 'paid')
-    .reduce((sum, c) => sum + (c.amount ?? 0), 0)
+const monthlyBreakdown = [
+  { month: '2026-04', total: 391, count: 1 },
+  { month: '2026-03', total: 523, count: 2 },
+  { month: '2026-02', total: 289, count: 1 },
+  { month: '2026-01', total: 412, count: 2 },
+  { month: '2025-12', total: 678, count: 3 },
+]
 
-  const monthlyBreakdown = new Map<string, { total: number; count: number }>()
-  for (const c of allCommissions) {
-    const month = c.period ?? c.created_at?.slice(0, 7) ?? 'Unknown'
-    const existing = monthlyBreakdown.get(month) ?? { total: 0, count: 0 }
-    existing.total += c.amount ?? 0
-    existing.count++
-    monthlyBreakdown.set(month, existing)
-  }
-  const sortedMonths = Array.from(monthlyBreakdown.entries()).sort(
-    (a, b) => b[0].localeCompare(a[0])
-  )
-
-  const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
-    pending: 'warning',
-    billed: 'info',
-    paid: 'success',
-    overdue: 'danger',
+export default function CommissionsPage() {
+  const card: React.CSSProperties = {
+    background: '#FFFFFF',
+    border: '1px solid #E2E8F0',
+    borderRadius: 12,
+    padding: 24,
   }
 
   return (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Commissions</h1>
-        <p className="mt-1 text-gray-500">
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0F172A', margin: 0 }}>
+          Commissions
+        </h1>
+        <p style={{ fontSize: 14, color: '#64748B', marginTop: 4 }}>
           Track your platform commission obligations
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <AeroStatCard
           label="Total Owed"
-          value={formatCurrency(totalOwed)}
-          icon={<DollarSign className="h-5 w-5" />}
+          value={formatEuro(totalOwed)}
+          icon={<DollarSign size={18} />}
         />
-        <StatCard
+        <AeroStatCard
           label="Pending"
-          value={formatCurrency(pendingAmount)}
-          icon={<Clock className="h-5 w-5" />}
+          value={formatEuro(pendingAmount)}
+          icon={<Clock size={18} />}
+          color="#F59E0B"
         />
-        <StatCard
+        <AeroStatCard
           label="Billed"
-          value={formatCurrency(billedAmount)}
-          icon={<FileText className="h-5 w-5" />}
+          value={formatEuro(billedAmount)}
+          icon={<FileText size={18} />}
+          color="#0EA5E9"
         />
-        <StatCard
+        <AeroStatCard
           label="Paid"
-          value={formatCurrency(paidAmount)}
-          icon={<CheckCircle2 className="h-5 w-5" />}
+          value={formatEuro(paidAmount)}
+          icon={<CheckCircle2 size={18} />}
+          color="#10B981"
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Commission Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {allCommissions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Booking</TableHead>
-                  <TableHead>Airline</TableHead>
-                  <TableHead>Booking Amount</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Commission</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allCommissions.map((commission: Record<string, unknown> & { id: string; booking?: { id: string; total_amount: number; airline?: { name: string } }; rate?: number; amount: number; period?: string; status: string }) => (
-                  <TableRow key={commission.id}>
-                    <TableCell className="font-mono text-xs">
-                      {commission.booking?.id?.slice(0, 8) ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      {commission.booking?.airline?.name ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      {commission.booking?.total_amount
-                        ? formatCurrency(commission.booking.total_amount)
-                        : '—'}
-                    </TableCell>
-                    <TableCell>
-                      {commission.rate != null
-                        ? `${(commission.rate * 100).toFixed(1)}%`
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(commission.amount)}
-                    </TableCell>
-                    <TableCell>
-                      {commission.period ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          statusVariant[commission.status] ?? 'default'
-                        }
-                      >
-                        {commission.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="py-12 text-center text-sm text-gray-400">
-              No commission records yet
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {sortedMonths.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-[#38bdf8]" />
-              Monthly Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {sortedMonths.map(([month, data]) => (
-                <div
-                  key={month}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 p-4"
-                >
-                  <div>
-                    <p className="font-medium text-[#1e3a5f]">{month}</p>
-                    <p className="text-xs text-gray-500">
-                      {data.count} commission{data.count !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <p className="text-lg font-bold text-[#1e3a5f]">
-                    {formatCurrency(data.total)}
-                  </p>
-                </div>
+      {/* Commission Details Table */}
+      <div style={card}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
+          Commission Details
+        </h3>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#F8FAFF' }}>
+                {['Booking', 'Airline', 'Booking Amount', 'Rate', 'Commission', 'Period', 'Status'].map(
+                  (col) => (
+                    <th
+                      key={col}
+                      style={{
+                        padding: '10px 14px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: '#94A3B8',
+                        textAlign: 'left',
+                        borderBottom: '1px solid #E2E8F0',
+                      }}
+                    >
+                      {col}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {demoCommissions.map((c) => (
+                <tr key={c.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                  <td
+                    style={{
+                      padding: '12px 14px',
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 12,
+                      color: '#0F172A',
+                    }}
+                  >
+                    {c.bookingRef}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: '#64748B' }}>
+                    {c.airline}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: '#0F172A' }}>
+                    {formatEuro(c.bookingAmount)}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: '#64748B' }}>
+                    {(c.rate * 100).toFixed(0)}%
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
+                    {formatEuro(c.amount)}
+                  </td>
+                  <td style={{ padding: '12px 14px', fontSize: 14, color: '#64748B' }}>
+                    {c.period}
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <StatusBadge status={c.status} />
+                  </td>
+                </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Monthly Breakdown */}
+      <div style={card}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TrendingUp size={18} color="#0EA5E9" />
+          Monthly Breakdown
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {monthlyBreakdown.map((m) => (
+            <div
+              key={m.month}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 14,
+                border: '1px solid #E2E8F0',
+                borderRadius: 8,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
+                  {m.month}
+                </div>
+                <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+                  {m.count} commission{m.count !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
+                {formatEuro(m.total)}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

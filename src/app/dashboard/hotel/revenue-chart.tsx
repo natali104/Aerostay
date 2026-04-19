@@ -9,57 +9,70 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts'
+import { DEMO_BOOKING_HISTORY } from '@/lib/demo'
 
-const data = [
-  { day: 'Mon', revenue: 2400 },
-  { day: 'Tue', revenue: 1800 },
-  { day: 'Wed', revenue: 3200 },
-  { day: 'Thu', revenue: 2800 },
-  { day: 'Fri', revenue: 3600 },
-  { day: 'Sat', revenue: 2200 },
-  { day: 'Sun', revenue: 1500 },
-]
+const revenueData = DEMO_BOOKING_HISTORY.map((d) => ({
+  day: d.day,
+  revenue: d.rooms * 89,
+}))
 
 export function RevenueChart() {
   return (
-    <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5">
-      <h3 className="mb-4 text-sm font-semibold text-[#F1F5F9]">
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderRadius: 12,
+        padding: 20,
+      }}
+    >
+      <h3
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: '#0F172A',
+          marginBottom: 16,
+        }}
+      >
         Revenue This Week
       </h3>
-      <div className="h-[260px]">
+      <div style={{ height: 260 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
+          <BarChart data={revenueData}>
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.06)"
+              stroke="#E2E8F0"
               vertical={false}
             />
             <XAxis
               dataKey="day"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              tick={{ fill: '#64748B', fontSize: 12 }}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#94A3B8', fontSize: 12 }}
+              tick={{ fill: '#64748B', fontSize: 12 }}
               tickFormatter={(v) => `€${v}`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#1E293B',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                color: '#F1F5F9',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 8,
+                color: '#0F172A',
                 fontSize: 13,
               }}
-              formatter={(value) => [`€${Number(value).toLocaleString()}`, 'Revenue']}
-              cursor={{ fill: 'rgba(59,158,255,0.08)' }}
+              formatter={(value) => [
+                `€${Number(value).toLocaleString()}`,
+                'Revenue',
+              ]}
+              cursor={{ fill: 'rgba(14,165,233,0.06)' }}
             />
             <Bar
               dataKey="revenue"
-              fill="#3B9EFF"
+              fill="#0EA5E9"
               radius={[4, 4, 0, 0]}
               maxBarSize={36}
             />

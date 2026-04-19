@@ -1,158 +1,228 @@
-import { createClient } from '@/lib/supabase/server'
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
-import { StatCard } from '@/components/dashboard/StatCard'
-import { formatEuro, formatDate } from '@/lib/format'
-import { Building2, Plane, AlertTriangle, DollarSign } from 'lucide-react'
-import { RevenueChart } from './revenue-chart'
-import { QuickActions } from './quick-actions'
+'use client'
 
-const statusColors: Record<string, { bg: string; text: string }> = {
-  pending: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
-  confirmed: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
-  cancelled: { bg: 'bg-red-500/20', text: 'text-red-400' },
-  completed: { bg: 'bg-[#3B9EFF]/20', text: 'text-[#3B9EFF]' },
-  declined: { bg: 'bg-red-500/20', text: 'text-red-400' },
-  negotiating: { bg: 'bg-[#F5A623]/20', text: 'text-[#F5A623]' },
-  booked: { bg: 'bg-[#22C55E]/20', text: 'text-[#22C55E]' },
+import AeroStatCard from '@/components/ui/AeroStatCard'
+import StatusBadge from '@/components/ui/StatusBadge'
+import ShimmerButton from '@/components/ui/ShimmerButton'
+import GlassCard from '@/components/ui/GlassCard'
+import { formatEuro } from '@/lib/format'
+import { timeAgo } from '@/lib/demo'
+import { Building2, Plane, AlertTriangle, DollarSign } from 'lucide-react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+} from 'recharts'
+
+const statusBorderColors: Record<string, string> = {
+  confirmed: '#10B981',
+  pending: '#F5A623',
+  negotiating: '#0EA5E9',
 }
 
-export default async function AdminDashboardPage() {
-  const supabase = await createClient()
+const recentActivity = [
+  { hotel: 'Hyatt Regency', airline: 'Bulgaria Air', status: 'confirmed', amount: 2314, time: new Date(Date.now() - 3 * 60000).toISOString() },
+  { hotel: 'Hilton Sofia', airline: 'Turkish Airlines', status: 'pending', amount: 3740, time: new Date(Date.now() - 8 * 60000).toISOString() },
+  { hotel: 'Radisson Blu', airline: 'Wizz Air', status: 'confirmed', amount: 1501, time: new Date(Date.now() - 22 * 60000).toISOString() },
+  { hotel: 'InterContinental', airline: 'Austrian Airlines', status: 'negotiating', amount: 1485, time: new Date(Date.now() - 35 * 60000).toISOString() },
+  { hotel: 'Marinela Hotel', airline: 'Ryanair', status: 'confirmed', amount: 6175, time: new Date(Date.now() - 52 * 60000).toISOString() },
+  { hotel: 'Hyatt Regency', airline: 'Lufthansa', status: 'pending', amount: 4450, time: new Date(Date.now() - 67 * 60000).toISOString() },
+  { hotel: 'Hilton Sofia', airline: 'Bulgaria Air', status: 'confirmed', amount: 890, time: new Date(Date.now() - 90 * 60000).toISOString() },
+  { hotel: 'Radisson Blu', airline: 'Turkish Airlines', status: 'confirmed', amount: 2370, time: new Date(Date.now() - 120 * 60000).toISOString() },
+]
 
-  const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+const revenueData = Array.from({ length: 30 }, (_, i) => ({
+  day: i + 1,
+  revenue: 600 + Math.floor(Math.random() * 400) + i * 15,
+}))
 
-  const [
-    hotelsRes,
-    airlinesRes,
-    layoversMonthRes,
-    commissionsRes,
-    recentBookingsRes,
-  ] = await Promise.all([
-    supabase.from('hotels').select('id', { count: 'exact', head: true }),
-    supabase.from('airlines').select('id', { count: 'exact', head: true }),
-    supabase
-      .from('layovers')
-      .select('id', { count: 'exact', head: true })
-      .gte('detected_at', monthStart),
-    supabase
-      .from('commissions')
-      .select('amount, status')
-      .neq('status', 'paid'),
-    supabase
-      .from('booking_requests')
-      .select(
-        'id, total_amount, status, created_at, hotel:hotels(name), airline:airlines(name)'
-      )
-      .order('created_at', { ascending: false })
-      .limit(15),
-  ])
-
-  const totalHotels = hotelsRes.count ?? 0
-  const totalAirlines = airlinesRes.count ?? 0
-  const layoversThisMonth = layoversMonthRes.count ?? 0
-  const platformRevenue = (commissionsRes.data ?? []).reduce(
-    (sum, c) => sum + (Number(c.amount) || 0),
-    0
-  )
-
-  const recentBookings = (recentBookingsRes.data ?? []).map((b) => {
-    const hotel = Array.isArray(b.hotel) ? b.hotel[0] : b.hotel
-    const airline = Array.isArray(b.airline) ? b.airline[0] : b.airline
-    return { ...b, _hotel: hotel as { name: string } | null, _airline: airline as { name: string } | null }
-  })
-
+function HealthRow({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="min-h-screen bg-[#0B1120] p-6">
-      <DashboardHeader
-        title="Platform Overview"
-        subtitle="AeroStay administration panel"
-      />
+    <div className="flex items-center justify-between py-2">
+      <span style={{ color: '#0F172A', fontSize: 14 }}>{label}</span>
+      <span
+        className="inline-flex items-center gap-1.5"
+        style={{ fontSize: 13, fontWeight: 500, color: ok ? '#059669' : '#DC2626' }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: ok ? '#10B981' : '#EF4444',
+            display: 'inline-block',
+          }}
+        />
+        {ok ? 'Operational' : 'Down'}
+      </span>
+    </div>
+  )
+}
 
+export default function AdminDashboardPage() {
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0F172A' }}>
+          Platform Overview
+        </h1>
+        <p style={{ fontSize: 14, color: '#64748B', marginTop: 2 }}>
+          AeroStay administration panel
+        </p>
+      </div>
+
+      {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+        <AeroStatCard
           label="Total Hotels"
-          value={totalHotels}
+          value={12}
           icon={<Building2 className="h-5 w-5" />}
+          color="#0F172A"
         />
-        <StatCard
+        <AeroStatCard
           label="Total Airlines"
-          value={totalAirlines}
+          value={8}
           icon={<Plane className="h-5 w-5" />}
+          color="#0F172A"
         />
-        <StatCard
+        <AeroStatCard
           label="Layovers This Month"
-          value={layoversThisMonth}
+          value={47}
+          trend={18}
           icon={<AlertTriangle className="h-5 w-5" />}
+          color="#0F172A"
         />
-        <StatCard
+        <AeroStatCard
           label="Platform Revenue"
-          value={formatEuro(platformRevenue)}
+          value="€18,432"
+          trend={12}
           icon={<DollarSign className="h-5 w-5" />}
+          color="#0F172A"
         />
       </div>
 
-      {/* Revenue Chart */}
-      <div className="mt-6">
-        <RevenueChart />
-      </div>
-
-      {/* Recent Activity */}
-      <div className="mt-6 rounded-xl border border-white/[0.08] bg-[#111827] p-6">
-        <h2 className="mb-4 text-lg font-semibold text-[#F1F5F9]">
-          Recent Activity
-        </h2>
-        {recentBookings.length === 0 ? (
-          <p className="py-12 text-center text-sm text-[#94A3B8]">
-            No recent activity
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {recentBookings.map((b) => {
-              const colors =
-                statusColors[b.status] ?? statusColors.pending
-              return (
+      {/* Two-column section */}
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Left — 60% */}
+        <div className="lg:col-span-3">
+          <GlassCard>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
+              Recent Platform Activity
+            </h2>
+            <div className="space-y-2">
+              {recentActivity.map((entry, i) => (
                 <div
-                  key={b.id}
-                  className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-[#0B1120] px-4 py-3"
+                  key={i}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                  style={{
+                    borderLeft: `3px solid ${statusBorderColors[entry.status] ?? '#94A3B8'}`,
+                    background: '#F8FAFC',
+                  }}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-medium text-[#F1F5F9]">
-                        {b._hotel?.name ?? 'Unknown Hotel'}
+                      <span style={{ fontWeight: 600, color: '#0F172A' }}>
+                        {entry.hotel}
                       </span>
-                      <span className="text-[#94A3B8]">·</span>
-                      <span className="text-[#94A3B8]">
-                        {b._airline?.name ?? 'Unknown Airline'}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-[#94A3B8]">
-                      {b.total_amount && (
-                        <span className="font-medium text-[#F1F5F9]">
-                          {formatEuro(Number(b.total_amount))}
-                        </span>
-                      )}
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors.bg} ${colors.text}`}
-                      >
-                        {b.status?.replace(/_/g, ' ')}
-                      </span>
+                      <span style={{ color: '#94A3B8' }}>·</span>
+                      <span style={{ color: '#64748B' }}>{entry.airline}</span>
                     </div>
                   </div>
-                  <span className="ml-4 shrink-0 text-xs text-[#94A3B8]">
-                    {b.created_at ? formatDate(b.created_at) : '—'}
+                  <StatusBadge status={entry.status} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap' }}>
+                    {formatEuro(entry.amount)}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#94A3B8', whiteSpace: 'nowrap' }}>
+                    {timeAgo(entry.time)}
                   </span>
                 </div>
-              )
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Right — 40% */}
+        <div className="lg:col-span-2 space-y-6">
+          <GlassCard>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
+              Quick Actions
+            </h2>
+            <div className="flex flex-col gap-3">
+              <ShimmerButton color="blue" size="md">Add Hotel Manually</ShimmerButton>
+              <ShimmerButton color="green" size="md">Send Announcement</ShimmerButton>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
+              Platform Health
+            </h2>
+            <div className="divide-y" style={{ borderColor: '#E2E8F0' }}>
+              <HealthRow label="API Status" ok />
+              <HealthRow label="Database" ok />
+              <HealthRow label="Email Service" ok />
+            </div>
+          </GlassCard>
+        </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="mt-6">
-        <QuickActions />
-      </div>
+      {/* Revenue chart */}
+      <GlassCard>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>
+          Revenue — Last 30 Days
+        </h2>
+        <div style={{ height: 200 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={revenueData}>
+              <defs>
+                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(14,165,233,0.08)" />
+                  <stop offset="100%" stopColor="rgba(14,165,233,0)" />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#94A3B8', fontSize: 11 }}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#94A3B8', fontSize: 11 }}
+                width={40}
+                tickFormatter={(v: number) => `€${v}`}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: 8,
+                  color: '#0F172A',
+                  fontSize: 13,
+                }}
+                formatter={(value) => [`€${Number(value).toLocaleString()}`, 'Revenue']}
+                labelFormatter={(label) => `Day ${label}`}
+              />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke="#0EA5E9"
+                strokeWidth={2}
+                fill="url(#revenueGrad)"
+                dot={false}
+                activeDot={{ r: 4, fill: '#0EA5E9', stroke: '#FFFFFF', strokeWidth: 2 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </GlassCard>
     </div>
   )
 }

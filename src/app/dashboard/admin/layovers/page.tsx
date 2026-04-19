@@ -1,4 +1,4 @@
-import { Clock, Search } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table'
 import { formatDateTime } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { DEMO_MODE } from '@/lib/demo'
 
 const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'default'> = {
   detected: 'info',
@@ -21,42 +22,77 @@ const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 
   cancelled: 'danger',
 }
 
+function DemoFallback() {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+      <p className="text-sm text-[#64748B]">
+        Demo mode — data will appear when connected to production database
+      </p>
+    </div>
+  )
+}
+
 export default async function AdminLayoversPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string; airport?: string }>
 }) {
-  const params = await searchParams
-  const supabase = await createClient()
+  let layovers: any[] | null = null
+  let airports: any[] = []
+  let params: { status?: string; airport?: string } = {}
 
-  let query = supabase
-    .from('layovers')
-    .select(
-      '*, airport:airports(name, iata_code), airline:airlines(name, iata_code)'
-    )
-    .order('detected_at', { ascending: false })
+  try {
+    params = await searchParams
+    const supabase = await createClient()
 
-  if (params.status) {
-    query = query.eq('status', params.status)
+    let query = supabase
+      .from('layovers')
+      .select(
+        '*, airport:airports(name, iata_code), airline:airlines(name, iata_code)'
+      )
+      .order('detected_at', { ascending: false })
+
+    if (params.status) {
+      query = query.eq('status', params.status)
+    }
+
+    if (params.airport) {
+      query = query.eq('airport_id', params.airport)
+    }
+
+    const [layoverResult, airportResult] = await Promise.all([
+      query,
+      supabase
+        .from('airports')
+        .select('id, iata_code, name')
+        .order('iata_code', { ascending: true }),
+    ])
+
+    if (layoverResult.error) throw layoverResult.error
+    layovers = layoverResult.data
+    airports = airportResult.data ?? []
+  } catch {
+    if (DEMO_MODE) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F172A]">Layovers</h1>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Track and manage detected airline layovers
+            </p>
+          </div>
+          <DemoFallback />
+        </div>
+      )
+    }
+    layovers = []
   }
-
-  if (params.airport) {
-    query = query.eq('airport_id', params.airport)
-  }
-
-  const [{ data: layovers }, { data: airports }] = await Promise.all([
-    query,
-    supabase
-      .from('airports')
-      .select('id, iata_code, name')
-      .order('iata_code', { ascending: true }),
-  ])
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Layovers</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-[#0F172A]">Layovers</h1>
+        <p className="mt-1 text-sm text-[#64748B]">
           Track and manage detected airline layovers
         </p>
       </div>
@@ -72,7 +108,7 @@ export default async function AdminLayoversPage({
             <LayoverFilters
               currentStatus={params.status}
               currentAirport={params.airport}
-              airports={airports ?? []}
+              airports={airports}
             />
           </div>
         </CardHeader>
@@ -116,7 +152,7 @@ export default async function AdminLayoversPage({
                     <TableCell>
                       {layover.airport ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="rounded bg-[#1e3a5f]/10 px-1.5 py-0.5 text-xs font-semibold text-[#1e3a5f]">
+                          <span className="rounded bg-[#0F172A]/10 px-1.5 py-0.5 text-xs font-semibold text-[#0F172A]">
                             {layover.airport.iata_code}
                           </span>
                           <span className="hidden text-xs text-gray-500 xl:inline">
@@ -179,7 +215,7 @@ function LayoverFilters({
       <select
         name="status"
         defaultValue={currentStatus ?? ''}
-        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#38bdf8] focus:outline-none focus:ring-2 focus:ring-[#38bdf8]/30"
+        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#0EA5E9] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
       >
         <option value="">All Statuses</option>
         <option value="detected">Detected</option>
@@ -192,7 +228,7 @@ function LayoverFilters({
       <select
         name="airport"
         defaultValue={currentAirport ?? ''}
-        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#38bdf8] focus:outline-none focus:ring-2 focus:ring-[#38bdf8]/30"
+        className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:border-[#0EA5E9] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
       >
         <option value="">All Airports</option>
         {airports.map((airport: any) => (
@@ -203,7 +239,7 @@ function LayoverFilters({
       </select>
       <button
         type="submit"
-        className="h-9 rounded-lg bg-[#1e3a5f] px-4 text-sm font-medium text-white hover:bg-[#162d4a] transition-colors"
+        className="h-9 rounded-lg bg-[#0EA5E9] px-4 text-sm font-medium text-white hover:bg-[#0284C7] transition-colors"
       >
         Filter
       </button>

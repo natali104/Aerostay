@@ -11,21 +11,54 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/server'
+import { DEMO_MODE } from '@/lib/demo'
+
+function DemoFallback() {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+      <p className="text-sm text-[#64748B]">
+        Demo mode — data will appear when connected to production database
+      </p>
+    </div>
+  )
+}
 
 export default async function AdminAirportsPage() {
-  const supabase = await createClient()
+  let airports: any[] | null = null
 
-  const { data: airports } = await supabase
-    .from('airports')
-    .select('*, hotels(id)')
-    .order('iata_code', { ascending: true })
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('airports')
+      .select('*, hotels(id)')
+      .order('iata_code', { ascending: true })
+
+    if (error) throw error
+    airports = data
+  } catch {
+    if (DEMO_MODE) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F172A]">Airports</h1>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Manage monitored airports and their hotel coverage
+            </p>
+          </div>
+          <DemoFallback />
+        </div>
+      )
+    }
+    airports = []
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Airports</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-[#0F172A]">Airports</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Manage monitored airports and their hotel coverage
           </p>
         </div>
@@ -69,7 +102,7 @@ export default async function AdminAirportsPage() {
                   return (
                     <TableRow key={airport.id}>
                       <TableCell>
-                        <span className="inline-flex items-center rounded-lg bg-[#1e3a5f] px-2.5 py-1 text-sm font-bold tracking-wider text-white">
+                        <span className="inline-flex items-center rounded-lg bg-[#0F172A] px-2.5 py-1 text-sm font-bold tracking-wider text-white">
                           {airport.iata_code}
                         </span>
                       </TableCell>

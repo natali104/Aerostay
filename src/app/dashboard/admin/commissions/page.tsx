@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { DEMO_MODE } from '@/lib/demo'
 
 const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 'default'> = {
   pending: 'warning',
@@ -27,17 +28,46 @@ const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'danger' | 
   waived: 'default',
 }
 
+function DemoFallback() {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+      <p className="text-sm text-[#64748B]">
+        Demo mode — data will appear when connected to production database
+      </p>
+    </div>
+  )
+}
+
 export default async function AdminCommissionsPage() {
-  const supabase = await createClient()
+  let allCommissions: any[] = []
 
-  const { data: commissions } = await supabase
-    .from('commissions')
-    .select(
-      '*, hotel:hotels(name), booking:booking_requests(id)'
-    )
-    .order('created_at', { ascending: false })
+  try {
+    const supabase = await createClient()
 
-  const allCommissions = commissions ?? []
+    const { data, error } = await supabase
+      .from('commissions')
+      .select(
+        '*, hotel:hotels(name), booking:booking_requests(id)'
+      )
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    allCommissions = data ?? []
+  } catch {
+    if (DEMO_MODE) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F172A]">Commissions</h1>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Track and manage commission earnings from hotel bookings
+            </p>
+          </div>
+          <DemoFallback />
+        </div>
+      )
+    }
+  }
 
   const totalEarned = allCommissions.reduce(
     (sum: number, c: any) => sum + (c.amount ?? 0),
@@ -56,8 +86,8 @@ export default async function AdminCommissionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Commissions</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-[#0F172A]">Commissions</h1>
+        <p className="mt-1 text-sm text-[#64748B]">
           Track and manage commission earnings from hotel bookings
         </p>
       </div>
@@ -97,7 +127,7 @@ export default async function AdminCommissionsPage() {
               <form method="POST" action="/api/commissions/bulk-bill">
                 <button
                   type="submit"
-                  className="h-9 rounded-lg border border-[#1e3a5f] bg-transparent px-4 text-sm font-medium text-[#1e3a5f] hover:bg-[#1e3a5f]/5 transition-colors"
+                  className="h-9 rounded-lg border border-[#0F172A] bg-transparent px-4 text-sm font-medium text-[#0F172A] hover:bg-[#0F172A]/5 transition-colors"
                 >
                   Mark as Billed
                 </button>
@@ -105,7 +135,7 @@ export default async function AdminCommissionsPage() {
               <form method="POST" action="/api/commissions/bulk-pay">
                 <button
                   type="submit"
-                  className="h-9 rounded-lg bg-[#1e3a5f] px-4 text-sm font-medium text-white hover:bg-[#162d4a] transition-colors"
+                  className="h-9 rounded-lg bg-[#0EA5E9] px-4 text-sm font-medium text-white hover:bg-[#0284C7] transition-colors"
                 >
                   Mark as Paid
                 </button>
@@ -177,7 +207,7 @@ export default async function AdminCommissionsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <button className="inline-flex items-center gap-1 text-sm text-[#38bdf8] hover:underline">
+                      <button className="inline-flex items-center gap-1 text-sm text-[#0EA5E9] hover:underline">
                         <ExternalLink className="h-3.5 w-3.5" />
                         View
                       </button>

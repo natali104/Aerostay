@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { useState, useMemo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import ShimmerButton from '@/components/ui/ShimmerButton'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -25,248 +24,271 @@ function toDateStr(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function availColor(count: number): string {
-  if (count === 0) return 'text-red-400'
-  if (count <= 5) return 'text-[#F5A623]'
-  return 'text-[#22C55E]'
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+function generateAvailability(year: number, month: number): Record<string, number> {
+  const days = getDaysInMonth(year, month)
+  const map: Record<string, number> = {}
+  days.forEach((d, i) => {
+    const seed = year * 10000 + month * 100 + d.getDate()
+    const rand = seededRandom(seed)
+    const dayOfWeek = d.getDay()
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const base = isWeekend ? 15 : 35
+    map[toDateStr(d)] = Math.round(base + rand * 30)
+  })
+  return map
 }
 
 export default function CalendarPage() {
-  const [hotelId, setHotelId] = useState<string | null>(null)
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth())
-  const [availability, setAvailability] = useState<
-    Record<string, { total: number; id: string | null }>
-  >({})
-  const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(true)
-
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [availability, setAvailability] = useState<Record<string, number>>(() =>
+    generateAvailability(new Date().getFullYear(), new Date().getMonth())
+  )
 
-  const supabase = createClient()
+  const days = useMemo(() => getDaysInMonth(year, month), [year, month])
+  const firstDayOfWeek = (days[0].getDay() + 6) % 7
+  const monthName = new Date(year, month).toLocaleString('default', { month: 'long' })
+  const todayStr = toDateStr(new Date())
 
-  const loadHotel = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('hotel_id')
-      .eq('id', user.id)
-      .single()
-    if (profile?.hotel_id) setHotelId(profile.hotel_id)
-  }, [supabase])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadHotel()
-  }, [loadHotel])
-
-  const loadData = useCallback(async () => {
-    if (!hotelId) return
-    setLoading(true)
-
-    const days = getDaysInMonth(year, month)
-    const firstDay = toDateStr(days[0])
-    const lastDay = toDateStr(days[days.length - 1])
-
-    const { data: roomTypes } = await supabase
-      .from('room_types')
-      .select('id')
-      .eq('hotel_id', hotelId)
-
-    const rtIds = roomTypes?.map((r) => r.id) ?? []
-
-    if (rtIds.length === 0) {
-      setAvailability({})
-      setBookingCounts({})
-      setLoading(false)
-      return
-    }
-
-    const { data: availData } = await supabase
-      .from('room_availability')
-      .select('id, room_type_id, date, available_count, is_blocked')
-      .in('room_type_id', rtIds)
-      .gte('date', firstDay)
-      .lte('date', lastDay)
-      .eq('is_blocked', false)
-
-    const map: Record<string, { total: number; id: string | null }> = {}
-    for (const row of availData ?? []) {
-      if (!map[row.date]) map[row.date] = { total: 0, id: row.id }
-      map[row.date].total += row.available_count ?? 0
-    }
-    setAvailability(map)
-
-    const { data: bookings } = await supabase
-      .from('booking_requests')
-      .select('check_in')
-      .eq('hotel_id', hotelId)
-      .eq('status', 'confirmed')
-      .gte('check_in', firstDay)
-      .lte('check_in', lastDay)
-
-    const bMap: Record<string, number> = {}
-    for (const b of bookings ?? []) {
-      bMap[b.check_in] = (bMap[b.check_in] ?? 0) + 1
-    }
-    setBookingCounts(bMap)
-    setLoading(false)
-  }, [hotelId, year, month, supabase])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData()
-  }, [loadData])
-
-  function goPrev() {
+  const goPrev = useCallback(() => {
     if (month === 0) {
       setMonth(11)
       setYear((y) => y - 1)
+      setAvailability(generateAvailability(year - 1, 11))
     } else {
       setMonth((m) => m - 1)
+      setAvailability(generateAvailability(year, month - 1))
     }
-  }
+  }, [month, year])
 
-  function goNext() {
+  const goNext = useCallback(() => {
     if (month === 11) {
       setMonth(0)
       setYear((y) => y + 1)
+      setAvailability(generateAvailability(year + 1, 0))
     } else {
       setMonth((m) => m + 1)
+      setAvailability(generateAvailability(year, month + 1))
     }
-  }
+  }, [month, year])
 
   function openDay(dateStr: string) {
     setSelectedDate(dateStr)
-    setEditValue(String(availability[dateStr]?.total ?? 0))
+    setEditValue(String(availability[dateStr] ?? 0))
   }
 
-  async function handleSave() {
-    if (!selectedDate || !hotelId) return
-    setSaving(true)
-
-    const { data: roomTypes } = await supabase
-      .from('room_types')
-      .select('id')
-      .eq('hotel_id', hotelId)
-      .limit(1)
-
-    const rtId = roomTypes?.[0]?.id
-    if (rtId) {
-      await supabase.from('room_availability').upsert(
-        {
-          room_type_id: rtId,
-          date: selectedDate,
-          available_count: parseInt(editValue) || 0,
-          is_blocked: false,
-        },
-        { onConflict: 'room_type_id,date' }
-      )
-    }
-
-    setSaving(false)
+  function handleSave() {
+    if (!selectedDate) return
+    setAvailability((prev) => ({ ...prev, [selectedDate]: parseInt(editValue) || 0 }))
     setSelectedDate(null)
-    loadData()
   }
 
-  const days = getDaysInMonth(year, month)
-  const firstDayOfWeek = (days[0].getDay() + 6) % 7
-  const monthName = new Date(year, month).toLocaleString('default', {
-    month: 'long',
-  })
+  function roomColor(count: number): string {
+    if (count === 0) return '#EF4444'
+    if (count <= 5) return '#0EA5E9'
+    return '#10B981'
+  }
 
   return (
-    <div className="space-y-6">
-      <DashboardHeader
-        title="Availability Calendar"
-        subtitle="Manage daily room availability"
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0F172A', margin: 0 }}>
+        Availability Calendar
+      </h1>
 
-      <div className="rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-5">
-        <div className="mb-5 flex items-center justify-between">
+      {/* Month navigation */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: 12,
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+          }}
+        >
           <button
             onClick={goPrev}
-            className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#3B9EFF]"
+            type="button"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748B',
+            }}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft size={18} />
           </button>
-          <h2 className="text-lg font-semibold text-[#F1F5F9]">
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0F172A', margin: 0 }}>
             {monthName} {year}
           </h2>
           <button
             onClick={goNext}
-            className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[#3B9EFF]"
+            type="button"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border: '1px solid #E2E8F0',
+              background: '#FFFFFF',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748B',
+            }}
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight size={18} />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        {/* Calendar grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          {/* Day headers */}
           {DAY_NAMES.map((d) => (
             <div
               key={d}
-              className="py-2 text-center text-xs font-medium text-[#94A3B8]"
+              style={{
+                padding: '8px 0',
+                textAlign: 'center',
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: '#94A3B8',
+              }}
             >
               {d}
             </div>
           ))}
 
+          {/* Blank cells */}
           {Array.from({ length: firstDayOfWeek }).map((_, i) => (
             <div key={`blank-${i}`} />
           ))}
 
-          {loading
-            ? days.map((d) => (
-                <div
-                  key={d.toISOString()}
-                  className="min-h-[80px] animate-pulse rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-2"
-                />
-              ))
-            : days.map((d) => {
-                const dateStr = toDateStr(d)
-                const avail = availability[dateStr]?.total ?? 0
-                const bookings = bookingCounts[dateStr] ?? 0
+          {/* Day cells */}
+          {days.map((d) => {
+            const dateStr = toDateStr(d)
+            const avail = availability[dateStr] ?? 0
+            const isToday = dateStr === todayStr
 
-                return (
-                  <button
-                    key={dateStr}
-                    type="button"
-                    onClick={() => openDay(dateStr)}
-                    className="group flex min-h-[80px] flex-col rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-2 text-left transition-all hover:border-[#3B9EFF]/30 hover:bg-[rgba(255,255,255,0.04)]"
-                  >
-                    <span className="text-xs text-[#94A3B8]">
-                      {d.getDate()}
-                    </span>
-                    <span
-                      className={`mt-auto text-lg font-bold ${availColor(avail)}`}
-                    >
-                      {avail}
-                    </span>
-                    {bookings > 0 && (
-                      <span className="mt-0.5 inline-flex w-fit items-center rounded-full bg-[#F5A623]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#F5A623]">
-                        {bookings} booking{bookings > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+            return (
+              <button
+                key={dateStr}
+                type="button"
+                onClick={() => openDay(dateStr)}
+                style={{
+                  minHeight: 80,
+                  background: isToday ? '#F0F9FF' : '#FFFFFF',
+                  border: `1px solid ${isToday ? '#0EA5E9' : '#E2E8F0'}`,
+                  borderRadius: 8,
+                  padding: 8,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  transition: 'background 0.15s ease',
+                  position: 'relative',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isToday) e.currentTarget.style.background = '#F0F9FF'
+                }}
+                onMouseLeave={(e) => {
+                  if (!isToday) e.currentTarget.style.background = '#FFFFFF'
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: '#64748B',
+                    textAlign: 'right',
+                    fontWeight: isToday ? 700 : 400,
+                  }}
+                >
+                  {d.getDate()}
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: roomColor(avail),
+                  }}
+                >
+                  {avail}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
+      {/* Edit modal */}
       {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="relative w-full max-w-sm rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#111827] p-6 shadow-2xl">
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={() => setSelectedDate(null)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: 12,
+              padding: 24,
+              width: '100%',
+              maxWidth: 380,
+              position: 'relative',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setSelectedDate(null)}
-              className="absolute right-3 top-3 text-[#94A3B8] hover:text-[#F1F5F9]"
+              type="button"
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: 12,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94A3B8',
+              }}
             >
-              <X className="h-5 w-5" />
+              <X size={20} />
             </button>
 
-            <h3 className="mb-1 text-lg font-semibold text-[#F1F5F9]">
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#0F172A', marginBottom: 4 }}>
               {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', {
                 weekday: 'long',
                 day: 'numeric',
@@ -274,12 +296,19 @@ export default function CalendarPage() {
                 year: 'numeric',
               })}
             </h3>
-            <p className="mb-5 text-sm text-[#94A3B8]">
-              Current availability: {availability[selectedDate]?.total ?? 0}{' '}
-              rooms
+            <p style={{ fontSize: 14, color: '#94A3B8', marginBottom: 20 }}>
+              Current availability: {availability[selectedDate] ?? 0} rooms
             </p>
 
-            <label className="mb-2 block text-sm font-medium text-[#94A3B8]">
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 500,
+                color: '#64748B',
+                marginBottom: 6,
+              }}
+            >
               Available Rooms
             </label>
             <input
@@ -287,16 +316,25 @@ export default function CalendarPage() {
               min={0}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="mb-5 w-full rounded-lg border border-[rgba(255,255,255,0.1)] bg-[#0A0F1E] px-3 py-2 text-[#F1F5F9] outline-none focus:border-[#3B9EFF] focus:ring-1 focus:ring-[#3B9EFF]"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                fontSize: 14,
+                border: '1px solid #E2E8F0',
+                borderRadius: 8,
+                outline: 'none',
+                color: '#0F172A',
+                background: '#F8FAFF',
+                marginBottom: 16,
+                boxSizing: 'border-box',
+              }}
+              onFocus={(e) => (e.target.style.borderColor = '#0EA5E9')}
+              onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
             />
 
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full rounded-lg bg-[#3B9EFF] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#3B9EFF]/90 disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+            <ShimmerButton color="blue" size="md" onClick={handleSave}>
+              Save
+            </ShimmerButton>
           </div>
         </div>
       )}

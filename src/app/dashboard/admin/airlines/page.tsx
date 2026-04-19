@@ -12,6 +12,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/server'
+import { DEMO_MODE } from '@/lib/demo'
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
   active: 'success',
@@ -20,20 +21,52 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'
   suspended: 'danger',
 }
 
-export default async function AdminAirlinesPage() {
-  const supabase = await createClient()
+function DemoFallback() {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+      <p className="text-sm text-[#64748B]">
+        Demo mode — data will appear when connected to production database
+      </p>
+    </div>
+  )
+}
 
-  const { data: airlines } = await supabase
-    .from('airlines')
-    .select('*, contacts:airline_contacts(id)')
-    .order('name', { ascending: true })
+export default async function AdminAirlinesPage() {
+  let airlines: any[] | null = null
+
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('airlines')
+      .select('*, contacts:airline_contacts(id)')
+      .order('name', { ascending: true })
+
+    if (error) throw error
+    airlines = data
+  } catch {
+    if (DEMO_MODE) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F172A]">Airlines</h1>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Manage airline partners and their contacts
+            </p>
+          </div>
+          <DemoFallback />
+        </div>
+      )
+    }
+    airlines = []
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1e3a5f]">Airlines</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-[#0F172A]">Airlines</h1>
+          <p className="mt-1 text-sm text-[#64748B]">
             Manage airline partners and their contacts
           </p>
         </div>
@@ -75,7 +108,7 @@ export default async function AdminAirlinesPage() {
                   <TableRow key={airline.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-sm font-bold text-[#1e3a5f]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F172A]/10 text-sm font-bold text-[#0F172A]">
                           {airline.iata_code ?? airline.name?.slice(0, 2)?.toUpperCase()}
                         </div>
                         <span className="font-medium">{airline.name}</span>
@@ -100,7 +133,7 @@ export default async function AdminAirlinesPage() {
                     <TableCell>
                       <Link
                         href={`/dashboard/admin/airlines/${airline.id}`}
-                        className="inline-flex items-center gap-1 text-sm text-[#38bdf8] hover:underline"
+                        className="inline-flex items-center gap-1 text-sm text-[#0EA5E9] hover:underline"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                         View
