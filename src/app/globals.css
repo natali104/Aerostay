@@ -143,7 +143,7 @@ body {
 
 .activity-ticker-scroll {
   display: inline-block;
-  animation: activity-scroll 30s linear infinite;
+  animation: activity-scroll 35s linear infinite;
 }
 
 .activity-ticker-scroll:hover {
@@ -167,4 +167,47 @@ body {
   .ticker-scroll {
     animation: none;
   }
+}
+
+:root {
+  --av-bg: #F0F4FF;
+  --av-card: #FFFFFF;
+  --av-sidebar: #0D1426;
+  --av-header: #0A0F1E;
+  --av-sky: #0EA5E9;
+  --av-sky-dark: #0369A1;
+  --av-sky-light: #E0F2FE;
+  --av-amber: #F5A623;
+  --av-green: #10B981;
+  --av-red: #EF4444;
+  --av-text: #0F172A;
+  --av-muted: #64748B;
+  --av-border: #E2E8F0;
+  --av-radar-bg: #070B14;
+  --av-radar-blue: #3B9EFF;
+}
+
+@keyframes shimmerSlide {
+  from { left: -100% }
+  to { left: 100% }
+}
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.6 }
+  100% { transform: scale(2.5); opacity: 0 }
+}
+@keyframes growLine {
+  from { width: 0% }
+  to { width: 100% }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+@keyframes slideInTop {
+  from { opacity: 0; transform: translateY(-16px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+@keyframes blipNew {
+  0% { box-shadow: 0 0 0 0 rgba(245,162,35,0.6) }
+  100% { box-shadow: 0 0 0 12px rgba(245,162,35,0) }
 }
