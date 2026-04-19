@@ -36,8 +36,11 @@ function SofiaTime() {
 
   return (
     <span
-      className="text-xs text-[#94A3B8]"
-      style={{ fontFamily: "'Space Mono', monospace" }}
+      style={{
+        fontFamily: "'Space Mono', monospace",
+        fontSize: 12,
+        color: '#64748B',
+      }}
     >
       {time}
     </span>
@@ -52,12 +55,15 @@ function Breadcrumb() {
     .filter(Boolean)
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
-      <span className="text-[#3B9EFF]">Dashboard</span>
+    <div className="flex items-center gap-1.5" style={{ fontSize: 13 }}>
+      <span style={{ color: '#0EA5E9', fontWeight: 500 }}>Dashboard</span>
       {segments.map((seg, i) => (
         <span key={i} className="flex items-center gap-1.5">
-          <span className="text-[#94A3B8]/40">/</span>
-          <span className={i === segments.length - 1 ? 'text-[#F1F5F9]' : ''}>
+          <span style={{ color: '#CBD5E1' }}>/</span>
+          <span style={{
+            color: i === segments.length - 1 ? '#0F172A' : '#64748B',
+            fontWeight: i === segments.length - 1 ? 500 : 400,
+          }}>
             {seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ')}
           </span>
         </span>
@@ -76,8 +82,14 @@ function UserAvatar({ name }: { name: string }) {
 
   return (
     <div
-      className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
-      style={{ backgroundColor: '#1a3a5c', color: '#3B9EFF' }}
+      className="flex items-center justify-center rounded-full font-semibold"
+      style={{
+        width: 34,
+        height: 34,
+        backgroundColor: '#E0F2FE',
+        color: '#0369A1',
+        fontSize: 13,
+      }}
     >
       {initials || '?'}
     </div>
@@ -93,7 +105,7 @@ export function DashboardShell({
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0A0F1E' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#F0F4FF' }}>
       <Sidebar
         role={role}
         userName={userName}
@@ -104,21 +116,22 @@ export function DashboardShell({
 
       <div
         className="ml-0 lg:ml-60 min-h-screen flex flex-col"
-        style={{ backgroundColor: '#0A0F1E' }}
+        style={{ backgroundColor: '#F0F4FF' }}
       >
-        {/* Top header */}
+        {/* Header bar */}
         <div
-          className="flex items-center justify-between px-6 py-3"
+          className="flex items-center justify-between px-6"
           style={{
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            height: 56,
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid #E2E8F0',
           }}
         >
           <div className="flex items-center gap-4">
-            {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden rounded-lg p-1.5 transition-colors hover:bg-[rgba(255,255,255,0.05)]"
-              style={{ color: '#94A3B8' }}
+              className="lg:hidden rounded-lg p-1.5 transition-colors"
+              style={{ color: '#64748B' }}
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -131,22 +144,23 @@ export function DashboardShell({
 
             {/* MONITORING badge */}
             <div
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-md"
+              className="hidden sm:flex items-center gap-1.5 rounded-md"
               style={{
                 backgroundColor: 'rgba(34,197,94,0.08)',
-                border: '0.5px solid rgba(34,197,94,0.3)',
+                border: '0.5px solid rgba(34,197,94,0.25)',
+                padding: '4px 12px',
               }}
             >
               <span
-                className="h-1.5 w-1.5 rounded-full animate-pulse"
+                className="rounded-full animate-pulse"
                 style={{
+                  width: 6,
+                  height: 6,
                   backgroundColor: '#22C55E',
                   boxShadow: '0 0 4px #22C55E',
                 }}
               />
-              <span
-                style={{ fontSize: 11, color: '#22C55E', fontWeight: 500 }}
-              >
+              <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 600, letterSpacing: '0.05em' }}>
                 MONITORING
               </span>
             </div>

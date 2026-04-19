@@ -73,11 +73,10 @@ export function ActivityTicker() {
 
   return (
     <div
-      className="relative flex items-center h-9 overflow-hidden"
+      className="relative flex items-center overflow-hidden"
       style={{
+        height: 34,
         backgroundColor: '#0A0F1E',
-        borderTop: '1px solid rgba(59,158,255,0.12)',
-        borderBottom: '1px solid rgba(59,158,255,0.12)',
       }}
     >
       {/* LIVE badge */}
@@ -85,13 +84,13 @@ export function ActivityTicker() {
         className="flex-shrink-0 flex items-center gap-1.5 px-3 z-10"
         style={{
           backgroundColor: 'rgba(34,197,94,0.1)',
-          borderRight: '1px solid rgba(59,158,255,0.12)',
+          borderRight: '1px solid rgba(14,165,233,0.12)',
           height: '100%',
         }}
       >
         <span
-          className="h-1.5 w-1.5 rounded-full animate-pulse"
-          style={{ backgroundColor: '#22C55E', boxShadow: '0 0 4px #22C55E' }}
+          className="rounded-full animate-pulse"
+          style={{ width: 6, height: 6, backgroundColor: '#22C55E', boxShadow: '0 0 4px #22C55E' }}
         />
         <span
           style={{
@@ -111,7 +110,7 @@ export function ActivityTicker() {
           className="activity-ticker-scroll whitespace-nowrap"
           style={{ fontFamily: "'Space Mono', monospace" }}
         >
-          <span style={{ fontSize: 11, color: 'rgba(59,158,255,0.8)' }}>
+          <span style={{ fontSize: 12, color: 'rgba(14,165,233,0.85)' }}>
             {doubled}
           </span>
         </div>

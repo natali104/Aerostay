@@ -78,10 +78,10 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
   const sidebarContent = (
     <div className="flex h-full flex-col" style={{ backgroundColor: '#0D1426' }}>
       {/* Logo */}
-      <div className="py-6 px-5">
-        <Link href="/dashboard" className="flex items-center gap-1 text-lg font-bold">
-          <span style={{ color: '#3B9EFF' }}>✦</span>
-          <span style={{ color: '#F1F5F9' }}>AeroStay</span>
+      <div style={{ padding: '24px 20px' }}>
+        <Link href="/dashboard" className="flex items-center gap-1" style={{ fontFamily: "'Space Mono', monospace" }}>
+          <span style={{ color: '#0EA5E9', fontSize: 18, fontWeight: 700 }}>✦</span>
+          <span style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 700 }}>AeroStay</span>
         </Link>
       </div>
 
@@ -96,15 +96,20 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
                 <Link
                   href={item.href}
                   onClick={onMobileClose}
-                  className="flex items-center gap-3 rounded-lg mx-3 px-5 py-2.5 text-sm transition-colors duration-150"
+                  className="flex items-center gap-3 px-5 py-2.5 text-sm transition-colors duration-150"
                   style={
                     active
-                      ? { color: '#3B9EFF', backgroundColor: 'rgba(59,158,255,0.1)' }
-                      : { color: '#94A3B8' }
+                      ? {
+                          color: '#FFFFFF',
+                          backgroundColor: 'rgba(14,165,233,0.15)',
+                          borderLeft: '3px solid #0EA5E9',
+                          paddingLeft: 17,
+                        }
+                      : { color: '#94A3B8', borderLeft: '3px solid transparent', paddingLeft: 17 }
                   }
                   onMouseEnter={(e) => {
                     if (!active) {
-                      e.currentTarget.style.color = '#F1F5F9'
+                      e.currentTarget.style.color = '#FFFFFF'
                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
                     }
                   }}
@@ -127,13 +132,14 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
       {/* Bottom section */}
       <div className="mt-auto border-t px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-2 mb-3">
-          <p className="truncate text-xs" style={{ color: '#94A3B8' }}>{userEmail}</p>
+          <p className="truncate" style={{ fontSize: 11, color: '#64748B' }}>{userEmail}</p>
           <span
-            className="shrink-0 uppercase px-2 py-0.5 rounded-full font-medium"
+            className="shrink-0 uppercase rounded-full font-medium"
             style={{
-              fontSize: '10px',
-              backgroundColor: 'rgba(59,158,255,0.15)',
-              color: '#3B9EFF',
+              fontSize: 11,
+              backgroundColor: 'rgba(14,165,233,0.12)',
+              color: '#0EA5E9',
+              padding: '2px 8px',
             }}
           >
             {role}
@@ -143,7 +149,7 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
           onClick={handleSignOut}
           className="flex items-center gap-2 text-xs transition-colors duration-150"
           style={{ color: '#94A3B8' }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#f87171' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444' }}
           onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}
         >
           <LogOut className="w-3.5 h-3.5" />
@@ -170,7 +176,8 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="fixed inset-0 bg-black/50"
+            className="fixed inset-0"
+            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
             onClick={onMobileClose}
           />
           <aside
