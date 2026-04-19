@@ -187,6 +187,24 @@ body {
   --av-radar-blue: #3B9EFF;
 }
 
+@keyframes landingTicker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.landing-ticker-scroll {
+  display: inline-block;
+  animation: landingTicker 35s linear infinite;
+}
+
+.landing-ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-ticker-scroll { animation: none; }
+}
+
 @keyframes shimmerSlide {
   from { left: -100% }
   to { left: 100% }
