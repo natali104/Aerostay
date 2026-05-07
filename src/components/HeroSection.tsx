@@ -419,8 +419,8 @@ export default function HeroSection() {
           >
             Get Started
           </Link>
-          <button
-            type="button"
+          <Link
+            href="/demo"
             className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold transition-all hover:bg-white/5"
             style={{
               color: '#E8EDF5',
@@ -437,7 +437,7 @@ export default function HeroSection() {
               <polygon points="0,0 10,6 0,12" />
             </svg>
             Watch Demo
-          </button>
+          </Link>
         </motion.div>
 
         <motion.div

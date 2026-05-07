@@ -127,6 +127,44 @@ export function Sidebar({ role, userName, userEmail, mobileOpen = false, onMobil
             )
           })}
         </ul>
+
+        {role === 'admin' && (
+          <div className="mt-4 pt-4 mx-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="mb-2 text-[10px] uppercase tracking-wider" style={{ color: '#64748B', letterSpacing: '0.08em' }}>
+              View as
+            </p>
+            <ul className="space-y-0.5">
+              <li>
+                <Link
+                  href="/dashboard/hotel"
+                  onClick={onMobileClose}
+                  className="flex items-center gap-3 py-2 text-sm transition-colors duration-150 rounded-md px-2"
+                  style={{
+                    color: pathname.startsWith('/dashboard/hotel') ? '#FFFFFF' : '#94A3B8',
+                    backgroundColor: pathname.startsWith('/dashboard/hotel') ? 'rgba(14,165,233,0.15)' : 'transparent',
+                  }}
+                >
+                  <Building2 className="w-[16px] h-[16px] shrink-0" />
+                  <span>Hotel Dashboard</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/dashboard/airline"
+                  onClick={onMobileClose}
+                  className="flex items-center gap-3 py-2 text-sm transition-colors duration-150 rounded-md px-2"
+                  style={{
+                    color: pathname.startsWith('/dashboard/airline') ? '#FFFFFF' : '#94A3B8',
+                    backgroundColor: pathname.startsWith('/dashboard/airline') ? 'rgba(14,165,233,0.15)' : 'transparent',
+                  }}
+                >
+                  <Plane className="w-[16px] h-[16px] shrink-0" />
+                  <span>Airline Dashboard</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
       </nav>
 
       {/* Bottom section */}

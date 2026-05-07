@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'For Hotels', href: '#for-hotels' },
   { label: 'For Airlines', href: '#for-airlines' },
+  { label: 'Demo', href: '/demo' },
 ]
 
 export default function Navbar() {
