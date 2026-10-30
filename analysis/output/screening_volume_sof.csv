@@ -1,0 +1,4 @@
+scenario,departures,overnight_events,room_nights,gmv_eur,aerostay_revenue_eur
+low,32882,99,3288,230174,18414
+base,32882,230,12276,1043455,83476
+high,32882,395,28936,2893616,231489
