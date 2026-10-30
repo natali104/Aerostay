@@ -1,0 +1,34 @@
+param,conservative,base,optimistic,unit,tag,basis
+rn_potential_per_airport,3288,12276,28936,room nights/year per SOF-equivalent airport,ОЦЕНКА,analysis/screening_volume.py low/base/high (SOF 2025 movements lead; overnight share 0.3/0.7/1.2%)
+airports_end_y1,1,2,4,SOF-equivalent airports live at month 12,ОЦЕНКА,SOF first; base adds Varna/Burgas-size or OTP share; no customer evidence yet
+airports_end_y2,2,4,8,SOF-equivalent airports at month 24,ОЦЕНКА,regional expansion BG/RO/Balkans
+airports_end_y3,3,6,12,SOF-equivalent airports at month 36,ОЦЕНКА,regional expansion
+first_live_month,9,6,4,month of first paying airport,ОЦЕНКА,airline/handler procurement + DPA + security review; no interviews yet
+share_max,0.20,0.40,0.60,share of disrupted room nights at a live airport captured,ОЦЕНКА,incumbents HRS/TA Connections/API serve global airlines (unverified)
+share_ramp_months,12,9,6,months from go-live to share_max,ОЦЕНКА,
+adr_eur,70,85,100,EUR per room night excl. VAT,ОЦЕНКА,no verified distressed-passenger rates found
+commission_rate,0.08,0.08,0.08,share of GMV paid by hotel,ФАКТ (код),src/app/api/bookings/[id]/confirm/route.ts:52 default 8%
+commission_collected_share,0.85,0.95,1.00,share of invoiced commission actually collected,ОЦЕНКА,no billing implemented; hotels may dispute
+hotel_payment_days,60,45,30,days from month end to commission cash-in,ОЦЕНКА,
+crew_rn_per_month_y3,0,1500,4000,crew room nights/month managed at end of y3,ОЦЕНКА,1 A320 night-stopping daily ~2200 RN/yr; ACMI payer unclear
+crew_fee_per_rn,2.0,2.0,2.0,EUR per crew room night,ОЦЕНКА,~2.4% of EUR 85; lead Routespring 1-2% per booking (unverified)
+crew_start_month,99,13,9,month crew stream starts,ОЦЕНКА,no crew features in code
+salary_founder,3500,4000,4500,EUR/month loaded,ОЦЕНКА,Bulgaria; not verified vs NSI wage data
+salary_dev,4500,4500,4500,EUR/month loaded,ОЦЕНКА,senior full-stack Bulgaria
+salary_ops,2000,2200,2200,EUR/month loaded per ops/support FTE,ОЦЕНКА,24/7 disruption coverage needs on-call
+ops_fte_y1,1,1,1,ops FTE from first_live_month,ОЦЕНКА,
+ops_fte_per_3_airports,1,1,1,additional ops FTE per 3 airports beyond first,ОЦЕНКА,
+salary_sales,4000,4000,4500,EUR/month loaded,ОЦЕНКА,
+sales_hire_month,99,13,10,month a dedicated sales hire starts,ОЦЕНКА,
+cloud_base,200,300,400,EUR/month hosting email DB,ОЦЕНКА,Supabase/Vercel/Resend pricing not verified
+cloud_per_airport,50,80,100,EUR/month per live airport,ОЦЕНКА,
+flight_data_api,0,800,1500,EUR/month from first_live_month,ОЦЕНКА,provider pricing not verified; conservative = manual trigger
+onboarding_per_airport,4000,3000,3000,EUR one-off per new airport (integration hotels training),ОЦЕНКА,
+travel_sales,800,1000,1500,EUR/month,ОЦЕНКА,
+marketing_events,500,800,1200,EUR/month,ОЦЕНКА,aviation events and trade fairs
+legal_one_off,6000,5000,5000,EUR one-off month 1 (DPA terms privacy),ОЦЕНКА,
+legal_monthly,200,300,400,EUR/month,ОЦЕНКА,
+insurance_annual,3000,4000,5000,EUR/year PI and cyber,ОЦЕНКА,
+admin_accounting,300,350,400,EUR/month,ОЦЕНКА,
+product_readiness_one_off,0,0,0,EUR (user asked to treat product as ready),ДОПУСКАНЕ,audit estimate 30-50 dev days if not ready
+starting_cash,0,0,0,EUR,ДОПУСКАНЕ,funding need is an output
