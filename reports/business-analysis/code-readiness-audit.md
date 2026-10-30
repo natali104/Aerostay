@@ -32,7 +32,7 @@
 |---|---|---|---|
 | Откриване на disruption/layover | **MOCKED** | `api/cron/check-layovers/route.ts:52-80` — 0–2 случайни полета от твърд списък | Няма flight data източник (FlightAware, OAG, Cirium, AODB и т.н.) |
 | Cron честота | PARTIAL | `vercel.json` — `0 0 * * *` (1×/ден) | „Real-time“ от README не съответства на дневен cron |
-| Синхронизация на цени с Booking.com | **MOCKED** | `api/cron/sync-pricing/route.ts:237-240` — ±5% случайна вариация | Няма Booking.com/channel manager интеграция |
+| Синхронизация на цени с Booking.com | **MOCKED** | `api/cron/sync-pricing/route.ts:7-8` — ±5% случайна вариация | Няма Booking.com/channel manager интеграция |
 | Известяване на авиокомпанията по email + token линк | IMPLEMENTED (непроверено end-to-end) | `check-layovers/route.ts:153-217` | Зависи от симулираните събития |
 | Валидиране на token | PARTIAL | `api/auth/token/route.ts:50-58` | Маркира `used_at`, но не отказва повторна употреба; bearer линк за 48 ч |
 | Списък хотели в booking engine | **BROKEN** | `book/page.tsx:215` вика `/api/hotels?airport_id=`, а такъв route няма (има само `api/hotels/[id]/availability`) | Грешката се поглъща тихо; стъпка 2 остава празна |
@@ -42,10 +42,10 @@
 | Потвърждение от хотела (UI на детайлна страница) | **BROKEN / несъвместимо** | `hotel/bookings/[id]/booking-actions.tsx:35,45` пише в таблица `bookings`; API и README използват `booking_requests` | Заобикаля confirm API → без комисионна. Полетата за negotiation също се различават (`booking_id/sender_id/proposed_amount` срещу `booking_request_id/proposed_by/proposed_price`) |
 | Потвърждение от live feed | IMPLEMENTED (непроверено) | `hotel/bookings/live-booking-feed.tsx:186` вика confirm API | Два различни пътя за една и съща операция |
 | Negotiation | PARTIAL | `api/bookings/[id]/negotiate/route.ts`; UI-то ползва друга schema | Същият проблем със сигурността като confirm |
-| Комисионна (по подразбиране 8%) | PARTIAL | `confirm/route.ts:72-74` | Само се записва; няма фактуриране, плащане или reconciliation. Бутоните `/api/commissions/bulk-bill` и `bulk-pay` водят към несъществуващи routes (`admin/commissions/page.tsx:127,135`) |
+| Комисионна (по подразбиране 8%) | PARTIAL | `confirm/route.ts:51-64` (fallback `|| 8` на ред 52 — ставка 0 също става 8%) | Само се записва; няма фактуриране, плащане или reconciliation. Бутоните `/api/commissions/bulk-bill` и `bulk-pay` водят към несъществуващи routes (`admin/commissions/page.tsx:127,135`) |
 | Passenger manifest CSV + разпределяне по стаи | IMPLEMENTED (client-side) | `layover-detail.tsx:144-275`, записва в `passengers` (`:314-315`) | Обработва имена и последните 4 цифри на паспорт — лични данни |
 | PDF ваучери с QR | IMPLEMENTED (client-side) | `layover-detail.tsx:324-424` | Текстът „Issued in compliance with EU Regulation 261/2004“ (`:396`) е твърдение без правна основа; QR не се валидира от хотелска страна |
-| Email „ваучерите са готови“ | IMPLEMENTED | `api/vouchers/send/route.ts` | Без auth: всеки може да изпрати email от домейна на AeroStay до произволен адрес (риск за злоупотреба/spam) |
+| Email „ваучерите са готови“ | IMPLEMENTED | `api/vouchers/send/route.ts` | Без auth: всеки може да изпрати email от домейна на AeroStay до произволен адрес (риск за злоупотреба/spam); `flightNumber` се вмъква в HTML без escape (`:15` и тялото) — HTML injection; съдържа и текста „Vouchers comply with EU Regulation 261/2004 requirements.“ |
 | Hotel settings, rooms, calendar | **MOCKED (само UI)** | `hotel/settings/page.tsx:41-44` (`setTimeout`), `hotel/calendar/page.tsx:87-90` (само local state), `hotel/rooms/page.tsx:9,48` (демо данни, празен onClick) | Хотелът не може реално да управлява наличност/цени |
 | Airline dashboard, contacts, preferences, settings | **MOCKED (само UI)** | `airline/page.tsx:21,48,79`, `airline/contacts/page.tsx:14`, `airline/preferences/page.tsx:6`, `airline/settings/page.tsx:55-61` | Контактите за известяване (ключови за workflow-а) не се записват от UI |
 | Admin страници | PARTIAL | Четат от Supabase, при грешка показват демо (`admin/hotels/page.tsx:75`) | `DEMO_MODE = true` е твърдо зададено (`lib/demo.ts:1`) |
@@ -60,6 +60,7 @@
 | Тема | Състояние | Доказателство |
 |---|---|---|
 | Auth/роли | Supabase Auth + пренасочване по роля за `/dashboard`; **всички `/api/*` са публични** | `lib/supabase/middleware.ts:43` |
+| Next.js 16 конвенции | `src/middleware.ts` използва deprecated конвенцията `middleware`; в Next.js 16 е преименувана на `proxy` | `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md:625-638` |
 | RLS | **НЕ МОЖЕ ДА СЕ ПРОВЕРИ** — политиките не са в репото | — |
 | Cron с anon клиент | Коментарът признава, че трябва service role (`check-layovers/route.ts:88`, `sync-pricing/route.ts:18`); с anon ключ и без сесия записите вероятно се блокират от RLS [ХИПОТЕЗА] | |
 | Input validation | Ръчни проверки; няма schema валидатор | grep за zod/валидатори: няма |
@@ -80,12 +81,25 @@
 4. Хотелски UI, който реално записва наличност/тарифи, или договорени фиксирани тарифи, въведени от админ.
 5. Записване на airline контакти.
 6. Privacy policy, terms, DPA шаблон (AeroStay като processor на авиокомпанията — виж regulatory map), минимизиране на данните (нужни ли са последните 4 цифри на паспорт?).
-7. Премахване на текста „compliance with EU 261/2004“ от ваучерите или замяна с неутрален.
+7. Премахване на текста „compliance with EU 261/2004“ от ваучерите (`layover-detail.tsx:396`) и от email-а (`api/vouchers/send/route.ts`) или замяна с неутрален; auth + escape в `api/vouchers/send`.
 8. Фактуриране/reconciliation: поне CSV експорт на потвърдени нощувки по хотел и авиокомпания.
 
 **Силно препоръчани:** структурирани логове + alerting (провалени emails), smoke tests на основния workflow, idempotency key при създаване на резервация, премахване на `DEMO_MODE` от production или ясна демо маркировка.
 
-**Effort [ОЦЕНКА]:** blockers 1–8 ≈ 6–10 седмици за един опитен full-stack разработчик (допускане: Supabase проектът вече съществува; без PMS/channel manager и flight data интеграции). Flight data интеграция: +2–4 седмици плюс лицензионни разходи (не са проверени). PMS/channel manager интеграции: зависи от доставчика — [НЕ Е НАМЕРЕНО], за проверка с конкретен хотел.
+**Effort [ОЦЕНКА]:** blockers 1–8 ≈ 6–10 седмици за един опитен full-stack разработчик (допускане: Supabase проектът вече съществува; без PMS/channel manager и flight data интеграции). Разбивка в работни дни [ОЦЕНКА, без външна база — експертна преценка по обема на засегнатия код]:
+
+| Blocker | Дни |
+|---|---|
+| 1. Schema, миграции, RLS, уеднаквяване на таблиците | 5–8 |
+| 2. Auth на API, серверни цени, еднократни tokens | 4–6 |
+| 3. Ръчно създаване на disruption събитие | 2–3 |
+| 4. Хотелски UI за наличност/тарифи (или админ въвеждане) | 5–8 |
+| 5. Airline контакти | 1–2 |
+| 6. Privacy/terms/DPA (без юридическия труд) + минимизиране на данни | 2–4 |
+| 7. Текстове за EU261 + vouchers/send | 1 |
+| 8. Експорт за фактуриране/reconciliation | 3–5 |
+| Smoke tests, логове, deploy, буфер | 7–13 |
+| **Общо** | **30–50 (≈ 6–10 седмици)** | Flight data интеграция: +2–4 седмици плюс лицензионни разходи (не са проверени). PMS/channel manager интеграции: зависи от доставчика — [НЕ Е НАМЕРЕНО], за проверка с конкретен хотел.
 
 ## Приоритетна roadmap [ОЦЕНКА]
 

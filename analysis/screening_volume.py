@@ -24,12 +24,13 @@ ASSUMPTIONS = {
 }
 
 
-def scenario(name):
+def scenario(name, overrides=None, fee_per_room_night=None):
     a = {k: v[name] for k, v in ASSUMPTIONS.items()}
+    a.update(overrides or {})
     events = DEPARTURES * a["overnight_share"]
     room_nights = events * a["pax_needing_hotel"] / a["pax_per_room"] * a["nights"]
     gmv = room_nights * a["room_rate_eur"]
-    revenue = gmv * a["commission_rate"]
+    revenue = room_nights * fee_per_room_night if fee_per_room_night else gmv * a["commission_rate"]
     return {
         "scenario": name,
         "departures": round(DEPARTURES),
@@ -49,3 +50,18 @@ if __name__ == "__main__":
         w.writerows(rows)
     for r in rows:
         print(r)
+
+    # Чувствителност около high сценария: по един параметър.
+    sens = [
+        ("high", scenario("high")),
+        ("180 pax на събитие", scenario("high", {"pax_needing_hotel": 180})),
+        ("дял нощувки 1,23%", scenario("high", {"overnight_share": 0.0123})),
+        ("€15 на room night вместо 8%", scenario("high", fee_per_room_night=15)),
+    ]
+    out_s = Path(__file__).parent / "output" / "screening_volume_sof_sensitivity.csv"
+    with out_s.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["case", "room_nights", "gmv_eur", "aerostay_revenue_eur"])
+        for label, r in sens:
+            w.writerow([label, r["room_nights"], r["gmv_eur"], r["aerostay_revenue_eur"]])
+            print(label, r["aerostay_revenue_eur"])

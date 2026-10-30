@@ -18,7 +18,7 @@
 - `src/app/api/cron/sync-pricing/route.ts` — Booking.com цените са **симулирани**.
 - `src/lib/demo.ts` — `DEMO_MODE = true`; демо данните използват реални имена на хотели и авиокомпании. Това **не** са клиенти или партньори.
 - В репото няма SQL миграции/schema, тестове или CI.
-- Бизнес моделът в кода: commission върху `total_amount` на резервацията, записвана към хотела, `hotel.commission_rate` или 8% по подразбиране (`src/app/api/bookings/[id]/confirm/route.ts:72-74`). `/pricing` е „coming soon“.
+- Бизнес моделът в кода: commission върху `total_amount` на резервацията, записвана към хотела, `hotel.commission_rate` или 8% по подразбиране (`src/app/api/bookings/[id]/confirm/route.ts:51-64`). `/pricing` е „coming soon“.
 - README твърди „47 минути“ и „60%“ без източник → [БЕЗ ИЗТОЧНИК].
 
 ## Правила
