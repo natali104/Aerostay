@@ -83,6 +83,8 @@ table.t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.6pt;l
 .t td{vertical-align:top;padding:2.1mm 2.6mm 2.1mm 0;border-bottom:.25mm solid var(--rule)}
 .t tr{break-inside:avoid}
 .t .num{text-align:right;padding-right:0}
+.t td.num,.t th.num{padding-left:3mm}            /* числова колона не се слепва със съседната */
+.t td.num + td:not(.num),.t th.num + th:not(.num){padding-left:5mm}
 .t tr.total td{font-weight:700;border-top:.3mm solid var(--ink);border-bottom:0}
 .t tr.hl td{background:var(--acc-t)}
 
