@@ -1,4 +1,4 @@
-scenario,new_airports_y2,cac_per_airport_eur (sales+50% founder / new airports y2),cac_incl_onboarding_eur,contribution_per_mature_airport_per_month_eur,payback_months,ltv
-conservative,1,36600,40600,-456,не се изплаща,не е изчислен: няма данни за churn
-base,2,46800,49800,1830,27.2,не е изчислен: няма данни за churn
-optimistic,4,28350,31350,10741,2.9,не е изчислен: няма данни за churn
+scenario,new_airports_y2,cac_per_airport_eur (sales+50% founder / new airports y2),cac_incl_onboarding_eur,contribution_per_mature_airport_per_month_eur,payback_months_if_mature_from_day1,payback_months_with_ramp,ltv
+conservative,1,36600,40600,-456,не се изплаща,не се изплаща,не е изчислен: няма данни за churn
+base,2,46800,49800,1830,27.2,33,не е изчислен: няма данни за churn
+optimistic,4,28350,31350,10741,2.9,6,не е изчислен: няма данни за churn

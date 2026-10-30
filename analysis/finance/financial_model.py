@@ -40,7 +40,7 @@ def airports_live(a, m):
 def run(a, pricing="commission", fee_rn=6.0, saas=1500.0, hybrid_base=750.0, hybrid_rn=3.0):
     rows, golive = [], []
     receivables = {}  # месец на постъпване -> сума
-    cash = 0.0
+    cash = a["starting_cash"]
     for m in range(1, MONTHS + 1):
         n = airports_live(a, m)
         new = n - len(golive)
@@ -142,9 +142,16 @@ def key_metrics(rows, a):
     last = rows[-1]
     # Break-even при зрялото летище: фиксирани месечни разходи / принос на нощувка.
     contrib_rn = a["adr_eur"] * a["commission_rate"] * a["commission_collected_share"]
-    fixed_m36 = last["opex_eur"] + last["cogs_eur"]  # всички разходи в м.36
-    rn_be = fixed_m36 / contrib_rn if contrib_rn else None
+    fixed_m36 = last["opex_eur"] + last["cogs_eur"]  # всички разходи в м.36 (за справка)
     rn_per_mature_airport = a["rn_potential_per_airport"] / 12 * a["share_max"]
+    # Повтарящи се фиксирани разходи: opex без onboarding + първият ops FTE + flight data API.
+    fixed_recurring = (a["salary_founder"] + a["salary_dev"] + (a["salary_sales"] if a["sales_hire_month"] <= MONTHS else 0)
+                       + a["cloud_base"] + a["travel_sales"] + a["marketing_events"] + a["legal_monthly"]
+                       + a["insurance_annual"] / 12 + a["admin_accounting"] + a["ops_fte_y1"] * a["salary_ops"] + a["flight_data_api"])
+    # Принос на зряло летище: събрана комисионна − облак на летище − пропорционален ops.
+    contrib_airport = rn_per_mature_airport * contrib_rn - a["cloud_per_airport"] - a["salary_ops"] * a["ops_fte_per_3_airports"] / 3
+    be_airports = fixed_recurring / contrib_airport if contrib_airport > 0 else None
+    rn_be = be_airports * rn_per_mature_airport if be_airports else None
     burn_y1 = -sum(min(0, r["cash_in_eur"] - r["cash_out_eur"]) for r in rows[:12]) / 12
     return {
         "funding_need_eur (min cumulative cash)": -min_cash if min_cash < 0 else 0,
@@ -152,10 +159,12 @@ def key_metrics(rows, a):
         "first_ebitda_positive_month": be or "няма до м.36",
         "avg_monthly_burn_y1_eur": round(burn_y1),
         "monthly_costs_m36_eur": round(fixed_m36),
+        "fixed_recurring_costs_per_month_eur": round(fixed_recurring),
         "contribution_per_room_night_eur": round(contrib_rn, 2),
-        "break_even_room_nights_per_month_m36": round(rn_be) if rn_be else None,
         "room_nights_per_mature_airport_per_month": round(rn_per_mature_airport),
-        "break_even_mature_airports_m36": round(rn_be / rn_per_mature_airport, 1) if rn_be and rn_per_mature_airport else None,
+        "contribution_per_mature_airport_eur": round(contrib_airport),
+        "break_even_mature_airports": round(be_airports, 1) if be_airports else "няма: приносът на летище е ≤ 0",
+        "break_even_room_nights_per_month": round(rn_be) if rn_be else "няма",
         "cash_end_m36_eur": last["cumulative_cash_eur"],
     }
 
@@ -174,9 +183,21 @@ def unit_economics(rows, a):
         "cac_per_airport_eur (sales+50% founder / new airports y2)": round(cac) if cac else None,
         "cac_incl_onboarding_eur": round(cac_total) if cac_total else None,
         "contribution_per_mature_airport_per_month_eur": round(contrib_m),
-        "payback_months": round(cac_total / contrib_m, 1) if cac_total and contrib_m > 0 else "не се изплаща",
+        "payback_months_if_mature_from_day1": round(cac_total / contrib_m, 1) if cac_total and contrib_m > 0 else "не се изплаща",
+        "payback_months_with_ramp": payback_with_ramp(a, cac_total, rn_m) if cac_total and contrib_m > 0 else "не се изплаща",
         "ltv": "не е изчислен: няма данни за churn",
     }
+
+
+def payback_with_ramp(a, cac, rn_mature):
+    """Месеци до възвръщане на CAC, като делът на летището расте за share_ramp_months."""
+    cum, fixed_part = 0.0, a["cloud_per_airport"] + a["salary_ops"] * a["ops_fte_per_3_airports"] / 3
+    for k in range(1, 121):
+        rn = rn_mature * min(1.0, k / a["share_ramp_months"])
+        cum += rn * a["adr_eur"] * a["commission_rate"] * a["commission_collected_share"] - fixed_part
+        if cum >= cac:
+            return k
+    return "над 120 месеца"
 
 
 def write(name, rows):
@@ -206,7 +227,9 @@ def main():
     for label, kw in [("Комисионна 8% от хотела", {"pricing": "commission"}),
                       ("€6 на нощувка от авиокомпанията", {"pricing": "fee_per_rn", "fee_rn": 6.0}),
                       ("SaaS €1 500 на летище/месец", {"pricing": "saas", "saas": 1500.0}),
-                      ("Хибрид €750/летище + €3/нощувка", {"pricing": "hybrid"})]:
+                      ("Хибрид €750/летище + €3/нощувка", {"pricing": "hybrid"}),
+                      ("SaaS €4 500 на летище/месец", {"pricing": "saas", "saas": 4500.0}),
+                      ("€11 на нощувка от авиокомпанията", {"pricing": "fee_per_rn", "fee_rn": 11.0})]:
         rows = run(A["base"], **kw)
         y = summarize(rows, A["base"])
         k = key_metrics(rows, A["base"])
@@ -214,6 +237,23 @@ def main():
                         "cash_end_m36_eur": rows[-1]["cumulative_cash_eur"],
                         "funding_need_eur": k["funding_need_eur (min cumulative cash)"]})
     write("pricing_comparison.csv", pricing)
+
+    # Варианти на базовия сценарий: хипотези, които не са в основните сценарии.
+    variants = []
+    for label, changes in [("Базов (основен)", {}),
+                           ("+ crew поток: 1 500 нощувки/месец до м.36, €2/нощувка, от м.13 (хипотеза)", {"crew_rn_per_month_y3": 1500, "crew_start_month": 13}),
+                           ("24/7 смени: 4,5 ops FTE от първото летище", {"ops_fte_y1": 4.5}),
+                           ("Оптимистичен с 24/7 смени", "opt247")]:
+        if changes == "opt247":
+            a = dict(A["optimistic"]); a["ops_fte_y1"] = 4.5
+        else:
+            a = dict(A["base"]); a.update(changes)
+        rows = run(a)
+        y = summarize(rows, a)
+        variants.append({"variant": label, "revenue_y3_eur": y[2]["revenue_eur"], "ebitda_y3_eur": y[2]["ebitda_eur"],
+                         "cash_end_m36_eur": rows[-1]["cumulative_cash_eur"],
+                         "funding_need_eur": key_metrics(rows, a)["funding_need_eur (min cumulative cash)"]})
+    write("variants_base.csv", variants)
 
     # Чувствителност ±20% около базовия сценарий.
     sens = []
@@ -224,7 +264,7 @@ def main():
             a = dict(A["base"])
             if p == "airports":
                 for k in ("airports_end_y1", "airports_end_y2", "airports_end_y3"):
-                    a[k] = max(1, round(a[k] * f))
+                    a[k] = max(1, a[k] * f)  # без закръгляне; airports_live() взема цяла част
             elif p == "salaries":
                 for k in ("salary_founder", "salary_dev", "salary_ops", "salary_sales"):
                     a[k] *= f
@@ -247,6 +287,8 @@ def main():
         print(p)
     for s in sens:
         print(s)
+    for v in variants:
+        print(v)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-scenario,funding_need_eur (min cumulative cash),funding_need_with_6m_buffer_eur,first_ebitda_positive_month,avg_monthly_burn_y1_eur,monthly_costs_m36_eur,contribution_per_room_night_eur,break_even_room_nights_per_month_m36,room_nights_per_mature_airport_per_month,break_even_mature_airports_m36,cash_end_m36_eur
-conservative,464318,534885.5,няма до м.36,11761,18496,4.76,3886,55,70.9,-464318
-base,498995,583710.0,няма до м.36,14119,27143,6.46,4202,409,10.3,-498995
-optimistic,138603,207907.5,11,11551,34517,8.0,4315,1447,3.0,1115999
+scenario,funding_need_eur (min cumulative cash),funding_need_with_6m_buffer_eur,first_ebitda_positive_month,avg_monthly_burn_y1_eur,monthly_costs_m36_eur,fixed_recurring_costs_per_month_eur,contribution_per_room_night_eur,room_nights_per_mature_airport_per_month,contribution_per_mature_airport_eur,break_even_mature_airports,break_even_room_nights_per_month,cash_end_m36_eur
+conservative,464318,534885.5,няма до м.36,11761,18496,12250,4.76,55,-456,няма: приносът на летище е ≤ 0,няма,-464318
+base,533495,618210.0,няма до м.36,14119,27143,18583,6.46,409,1830,10.2,4155,-533495
+optimistic,140318,210479.0,11,11694,34517,21517,8.0,1447,10741,2.0,2898,1007999

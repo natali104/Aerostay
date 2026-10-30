@@ -7,16 +7,16 @@ first_live_month,9,6,4,month of first paying airport,ОЦЕНКА,airline/handle
 share_max,0.20,0.40,0.60,share of disrupted room nights at a live airport captured,ОЦЕНКА,incumbents HRS/TA Connections/API serve global airlines (unverified)
 share_ramp_months,12,9,6,months from go-live to share_max,ОЦЕНКА,
 adr_eur,70,85,100,EUR per room night excl. VAT,ОЦЕНКА,no verified distressed-passenger rates found
-commission_rate,0.08,0.08,0.08,share of GMV paid by hotel,ФАКТ (код),src/app/api/bookings/[id]/confirm/route.ts:52 default 8%
+commission_rate,0.08,0.08,0.08,share of GMV paid by hotel,ФАКТ (код) / ХИПОТЕЗА (пазар),code fallback is 8% (src/app/api/bookings/[id]/confirm/route.ts:52); whether hotels accept 8% is untested
 commission_collected_share,0.85,0.95,1.00,share of invoiced commission actually collected,ОЦЕНКА,no billing implemented; hotels may dispute
 hotel_payment_days,60,45,30,days from month end to commission cash-in,ОЦЕНКА,
-crew_rn_per_month_y3,0,1500,4000,crew room nights/month managed at end of y3,ОЦЕНКА,1 A320 night-stopping daily ~2200 RN/yr; ACMI payer unclear
+crew_rn_per_month_y3,0,0,0,crew room nights/month at end of y3 (main scenarios exclude crew; see crew variant),ХИПОТЕЗА,1 A320 night-stopping daily ~2200 RN/yr; ACMI payer unclear
 crew_fee_per_rn,2.0,2.0,2.0,EUR per crew room night,ОЦЕНКА,~2.4% of EUR 85; lead Routespring 1-2% per booking (unverified)
 crew_start_month,99,13,9,month crew stream starts,ОЦЕНКА,no crew features in code
 salary_founder,3500,4000,4500,EUR/month loaded,ОЦЕНКА,Bulgaria; not verified vs NSI wage data
 salary_dev,4500,4500,4500,EUR/month loaded,ОЦЕНКА,senior full-stack Bulgaria
 salary_ops,2000,2200,2200,EUR/month loaded per ops/support FTE,ОЦЕНКА,24/7 disruption coverage needs on-call
-ops_fte_y1,1,1,1,ops FTE from first_live_month,ОЦЕНКА,
+ops_fte_y1,1,1,1,ops FTE from first_live_month (lean: founder on call nights/weekends; 24/7 shifts need ~4-5 FTE - see variant),ОЦЕНКА,
 ops_fte_per_3_airports,1,1,1,additional ops FTE per 3 airports beyond first,ОЦЕНКА,
 salary_sales,4000,4000,4500,EUR/month loaded,ОЦЕНКА,
 sales_hire_month,99,13,10,month a dedicated sales hire starts,ОЦЕНКА,
