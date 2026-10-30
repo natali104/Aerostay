@@ -226,14 +226,17 @@ def main():
     pricing = []
     for label, kw in [("Комисионна 8% от хотела", {"pricing": "commission"}),
                       ("€6 на нощувка от авиокомпанията", {"pricing": "fee_per_rn", "fee_rn": 6.0}),
-                      ("SaaS €1 500 на летище/месец", {"pricing": "saas", "saas": 1500.0}),
+                      ("Абонамент €1 500 на летище месечно", {"pricing": "saas", "saas": 1500.0}),
                       ("Хибрид €750/летище + €3/нощувка", {"pricing": "hybrid"}),
-                      ("SaaS €4 500 на летище/месец", {"pricing": "saas", "saas": 4500.0}),
+                      ("Абонамент €4 500 на летище месечно", {"pricing": "saas", "saas": 4500.0}),
+                      ("€10 на нощувка от авиокомпанията", {"pricing": "fee_per_rn", "fee_rn": 10.0}),
                       ("€11 на нощувка от авиокомпанията", {"pricing": "fee_per_rn", "fee_rn": 11.0})]:
         rows = run(A["base"], **kw)
         y = summarize(rows, A["base"])
         k = key_metrics(rows, A["base"])
         pricing.append({"model": label, "revenue_y3_eur": y[2]["revenue_eur"], "ebitda_y3_eur": y[2]["ebitda_eur"],
+                        "first_ebitda_positive_month": k["first_ebitda_positive_month"],
+                        "ebitda_m36_eur": rows[-1]["ebitda_eur"],
                         "cash_end_m36_eur": rows[-1]["cumulative_cash_eur"],
                         "funding_need_eur": k["funding_need_eur (min cumulative cash)"]})
     write("pricing_comparison.csv", pricing)
