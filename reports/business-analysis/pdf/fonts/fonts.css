@@ -1,0 +1,5 @@
+/* Статични TTF файлове (конвертирани от OTF с fontTools: CFF контурите дават Type 3 в Chrome) (без променлив шрифт → без Type 3). Всяка тежест, ползвана в tokens.css, има файл. */
+@font-face { font-family: 'Inter'; font-weight: 400; src: url(Inter-Regular.ttf) format('truetype'); }
+@font-face { font-family: 'Inter'; font-weight: 600; src: url(Inter-SemiBold.ttf) format('truetype'); }
+@font-face { font-family: 'Inter'; font-weight: 700; src: url(Inter-Bold.ttf) format('truetype'); }
+@font-face { font-family: 'Inter Display'; font-weight: 800; src: url(InterDisplay-ExtraBold.ttf) format('truetype'); }
