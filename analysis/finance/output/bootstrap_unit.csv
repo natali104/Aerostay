@@ -1,0 +1,4 @@
+scenario,room_nights_per_month,gmv_per_month_eur,collected_commission_per_month_eur,fixed_costs_one_airport_eur,profit_one_airport_per_month_eur
+conservative,55,3836,261,675,-414
+base,409,34782,2643,495,2148
+optimistic,1447,144680,11574,443,11131

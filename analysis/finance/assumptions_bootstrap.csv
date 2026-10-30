@@ -1,0 +1,25 @@
+param,conservative,base,optimistic,unit,tag,basis
+rn_potential_per_airport,3288,12276,28936,room nights/year per SOF-equivalent airport,ОЦЕНКА,same as main model (analysis/screening_volume.py)
+first_live_month,9,6,4,month of first live airport,ОЦЕНКА,
+airports_end_y1,1,1,2,airports live at month 12,ОЦЕНКА,solo founder: fewer airports than funded model
+airports_end_y2,1,2,4,airports live at month 24,ОЦЕНКА,
+airports_end_y3,2,4,8,airports live at month 36,ОЦЕНКА,
+share_max,0.20,0.40,0.60,share of disrupted room nights captured,ОЦЕНКА,
+share_ramp_months,12,9,6,months to share_max,ОЦЕНКА,
+adr_eur,70,85,100,EUR per room night excl. VAT,ОЦЕНКА,
+commission_rate,0.08,0.08,0.08,share of GMV paid by hotel,ФАКТ (код) / ХИПОТЕЗА (пазар),code fallback 8%; hotel acceptance untested
+commission_collected_share,0.85,0.95,1.00,share of commission collected,ОЦЕНКА,
+hotel_payment_days,60,45,30,days to cash-in,ОЦЕНКА,
+founder_salary,0,0,0,EUR/month,ДОПУСКАНЕ (основател),founder does development support and sales unpaid
+cloud_base,80,60,50,EUR/month hosting DB email domain,ОЦЕНКА,Supabase/Vercel/Resend entry plans; price lists not verified (blocked)
+cloud_per_airport,20,15,10,EUR/month per live airport,ОЦЕНКА,
+flight_data,0,0,0,EUR/month,ДОПУСКАНЕ (основател),open-source flight data; commercial-use licence not verified
+accounting,150,120,100,EUR/month,ОЦЕНКА,Bulgarian company bookkeeping; not verified
+legal_one_off,3000,2000,1500,EUR month 1 (DPA terms privacy),ОЦЕНКА,
+insurance_annual,1500,1200,1000,EUR/year cyber and professional liability,ОЦЕНКА,airlines/handlers may require it
+travel_sales,300,200,200,EUR/month,ОЦЕНКА,
+onboarding_per_airport,800,500,300,EUR one-off per new airport,ОЦЕНКА,travel and hotel onboarding
+hire1_revenue_trigger,6000,6000,6000,EUR trailing 3-month avg monthly revenue to hire first support person,ДОПУСКАНЕ (основател),reinvest from revenue
+hire1_cost,2200,2200,2200,EUR/month loaded,ОЦЕНКА,
+hire2_revenue_trigger,12000,12000,12000,EUR trailing 3-month avg monthly revenue for second hire,ДОПУСКАНЕ (основател),
+hire2_cost,2500,2500,2500,EUR/month loaded,ОЦЕНКА,

@@ -1,0 +1,4 @@
+scenario,own_money_needed_eur,first_profitable_month,cash_back_to_zero_month,monthly_profit_m36_eur,cash_end_m36_eur
+conservative,23413,няма до м.36,няма до м.36,-1212,-23413
+base,6091,7,15,4397,58136
+optimistic,3543,4,6,73578,860053
